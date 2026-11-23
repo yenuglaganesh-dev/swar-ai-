@@ -1,0 +1,13 @@
+const fs=require('fs');
+const p='server/index.js';
+let s=fs.readFileSync(p,'utf8');
+s=s.replace(
+  "  const apiUrl = process.env.AI_API_URL || 'https://api.openai.com/v1/chat/completions';\n  const model = process.env.AI_MODEL || 'gpt-4o-mini';\n  const visionModel = process.env.AI_VISION_MODEL || model;",
+  "  const apiUrl = process.env.AI_API_URL || 'https://opencode.ai/zen/v1/chat/completions';\n  const model = process.env.AI_MODEL || 'mimo-v2.5-free';\n  const visionModel = process.env.AI_VISION_MODEL || model;"
+);
+s=s.replace(
+  "    if (!response.ok) {\n      const errText = await response.text().catch(() => '');\n      let providerError = {};\n      try { providerError = JSON.parse(errText)?.error || {}; } catch { /* ignore */ }\n      const safeProviderMessage = typeof providerError.message === 'string' ? providerError.message.slice(0, 300) : `Upstream status ${response.status}`;\n      const safeCode = typeof providerError.code === 'string' ? providerError.code : undefined;\n      console.error('AI API error', { status: response.status, type: providerError.type, code: safeCode, message: safeProviderMessage });\n      return res.status(200).json({\n        ...fallbackResponse('', language, 'AI_UPSTREAM_ERROR'),\n        providerStatus: response.status,\n        providerCode: safeCode,\n        providerMessage: safeProviderMessage,\n      });\n    }",
+  "    if (!response.ok) {\n      const errText = await response.text().catch(() => '');\n      let providerError = {};\n      try { providerError = JSON.parse(errText)?.error || {}; } catch { /* ignore */ }\n      const safeProviderMessage = typeof providerError.message === 'string' ? providerError.message.slice(0, 300) : `Upstream status ${response.status}`;\n      const safeCode = typeof providerError.code === 'string' ? providerError.code : (typeof providerError.type === 'string' ? providerError.type : undefined);\n      let reason = 'AI_UPSTREAM_ERROR';\n      if (response.status === 401 || response.status === 403) reason = 'AI_AUTH_ERROR';\n      else if (response.status === 429) reason = 'AI_RATE_LIMITED';\n      else if (response.status === 404) reason = 'AI_MODEL_OR_ENDPOINT_ERROR';\n      else if (response.status === 400) reason = 'AI_BAD_REQUEST';\n      console.error('AI API error', { status: response.status, type: providerError.type, code: safeCode, message: safeProviderMessage });\n      return res.status(200).json({\n        ...fallbackResponse('', language, reason),\n        providerStatus: response.status,\n        providerCode: safeCode,\n        providerMessage: safeProviderMessage,\n      });\n    }"
+);
+fs.writeFileSync(p,s);
+console.log('ok');
