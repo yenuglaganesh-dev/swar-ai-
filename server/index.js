@@ -14,6 +14,17 @@ const DEFAULT_WEATHER_LOCATION = process.env.DEFAULT_WEATHER_LOCATION || 'Hydera
 app.use(cors({ origin: CLIENT_ORIGIN, credentials: true }));
 app.use(express.json({ limit: '1mb' }));
 
+// Vercel catch-all functions can expose the path with or without the /api
+// prefix depending on the function route. Normalize it before Express routing.
+if (process.env.VERCEL) {
+  app.use((req, _res, next) => {
+    if (req.path !== '/api' && !req.path.startsWith('/api/')) {
+      req.url = `/api${req.url}`;
+    }
+    next();
+  });
+}
+
 // Simple in-memory rate limiter for external API endpoints (free-plan protection)
 const rateBuckets = new Map();
 function rateLimit(key, limit, windowMs) {
@@ -51,8 +62,8 @@ function buildSystemPrompt(language, autoDetect, context = {}) {
     'Your mission is to make AI accessible to everyone, including people who cannot comfortably read, write, or type.',
     'Supported languages: Telugu (te-IN), Hindi (hi-IN), English (en-IN).',
     autoDetect
-      ? `The user has auto language detection enabled. Detect whether the user message is Telugu, Hindi, or English, and respond in that same language. If mixed or unclear, prefer ${langName}.`
-      : `Respond in ${langName} (${language}) unless the user explicitly asks for another supported language.`,
+      ? `Detect the language of the latest user message. If it is Telugu, answer in natural Telugu script; if Hindi, answer in natural Devanagari Hindi; if English, answer in English. For mixed Telugu-English or Hindi-English, mirror the user's mix naturally. If unclear, use ${langName}. The latest message language takes priority over earlier conversation turns.`
+      : `Use ${langName} (${language}) for the entire answer. Telugu must be written in Telugu script, Hindi in Devanagari, and English in Latin script. If the user explicitly requests another of these three languages, follow that request. The latest message language/request takes priority.`
     modeHint,
     memories.length ? `User memory (only use if relevant, user consented): ${memories.slice(0, 8).map((m) => `- ${m}`).join(' ')}` : 'No personal memory is available.',
     documentText ? `Document context provided by user (use it to answer/explain):\n${documentText.slice(0, 12000)}` : '',
@@ -100,6 +111,26 @@ function fallbackResponse(_message, language, reason = 'AI_SERVICE_UNAVAILABLE')
       'en-IN': 'The AI provider returned an error. Check AI_API_KEY, AI_API_URL, model access, and server logs.',
       'hi-IN': 'AI प्रदाता ने त्रुटि लौटाई। AI_API_KEY, AI_API_URL, मॉडल एक्सेस और सर्वर लॉग जांचें।',
       'te-IN': 'AI ప్రొవైడర్ లోపాన్ని తిరిగి ఇచ్చింది. AI_API_KEY, AI_API_URL, మోడల్ యాక్సెస్ మరియు సర్వర్ లాగ్‌లను తనిఖీ చేయండి.',
+    },
+    AI_AUTH_ERROR: {
+      'en-IN': 'The AI provider rejected the API key. Check that AI_API_KEY is valid and has access to the selected model.',
+      'hi-IN': 'AI सेवा ने API key अस्वीकार कर दी। जाँचें कि AI_API_KEY सही है और चुने गए मॉडल की अनुमति है।',
+      'te-IN': 'AI ప్రొవైడర్ API key‌ను తిరస్కరించింది. AI_API_KEY సరైనదో మరియు ఎంచుకున్న మోడల్‌కు అనుమతి ఉందో తనిఖీ చేయండి.',
+    },
+    AI_RATE_LIMITED: {
+      'en-IN': 'The AI provider rate limit or quota has been reached. Please wait and try again.',
+      'hi-IN': 'AI सेवा की अनुरोध सीमा या कोटा पूरा हो गया है। कृपया थोड़ी देर बाद फिर प्रयास करें।',
+      'te-IN': 'AI ప్రొవైడర్ అభ్యర్థన పరిమితి లేదా కోటా పూర్తయింది. కొద్దిసేపటి తర్వాత మళ్లీ ప్రయత్నించండి.',
+    },
+    AI_MODEL_OR_ENDPOINT_ERROR: {
+      'en-IN': 'The configured AI model or API endpoint was not found. Check AI_MODEL and AI_API_URL.',
+      'hi-IN': 'कॉन्फ़िगर किया गया AI मॉडल या API endpoint नहीं मिला। AI_MODEL और AI_API_URL जाँचें।',
+      'te-IN': 'కాన్ఫిగర్ చేసిన AI మోడల్ లేదా API endpoint కనబడలేదు. AI_MODEL మరియు AI_API_URL తనిఖీ చేయండి.',
+    },
+    AI_BAD_REQUEST: {
+      'en-IN': 'The AI provider rejected the request format. Check the selected model and API compatibility.',
+      'hi-IN': 'AI सेवा ने अनुरोध का प्रारूप अस्वीकार किया। चुने गए मॉडल और API compatibility जाँचें।',
+      'te-IN': 'AI ప్రొవైడర్ అభ్యర్థన ఫార్మాట్‌ను తిరస్కరించింది. ఎంచుకున్న మోడల్ మరియు API compatibility తనిఖీ చేయండి.',
     },
     AI_SERVICE_UNAVAILABLE: {
       'en-IN': "I'm having trouble reaching the AI service right now. Please check the server configuration and try again.",
@@ -220,79 +251,90 @@ app.post('/api/news', async (req, res) => {
 });
 
 app.post('/api/chat', async (req, res) => {
-  const { messages = [], language = 'en-IN', autoDetect = false, mode = 'default', memories = [], documentText = '', imageDataUrl = '', locationHint = '' } = req.body || {};
+  const body = req.body || {};
+  const messages = body.messages ?? [];
+  const language = ['te-IN', 'hi-IN', 'en-IN'].includes(body.language) ? body.language : 'en-IN';
+  const autoDetect = body.autoDetect === true;
+  const mode = body.mode || 'default';
+  const memories = Array.isArray(body.memories) ? body.memories : [];
+  const documentText = typeof body.documentText === 'string' ? body.documentText : '';
+  const imageDataUrl = typeof body.imageDataUrl === 'string' ? body.imageDataUrl : '';
+  const locationHint = typeof body.locationHint === 'string' ? body.locationHint : '';
 
   if (!Array.isArray(messages)) {
     return res.status(400).json({ error: 'messages must be an array' });
   }
 
   const safeMessages = messages
-    .filter((m) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
+    .filter((m) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string' && m.content.trim())
     .slice(-12)
     .map((m) => ({ role: m.role, content: m.content.slice(0, 4000) }));
+  const lastUser = [...safeMessages].reverse().find((m) => m.role === 'user')?.content || '';
+  if (!lastUser) {
+    return res.status(400).json({ reply: 'Please enter a message and try again.', detectedLanguage: language, suggestions: [] });
+  }
 
+  // Unicode-script detection is reliable for Telugu and Hindi; English is the fallback.
+  const detectedFromText = /[\\u0C00-\\u0C7F]/u.test(lastUser) ? 'te-IN'
+    : /[\\u0900-\\u097F]/u.test(lastUser) ? 'hi-IN' : 'en-IN';
+  const responseLanguage = autoDetect ? detectedFromText : language;
   const apiKey = process.env.AI_API_KEY;
   const apiUrl = process.env.AI_API_URL || 'https://opencode.ai/inference/openai/v1/chat/completions';
   const model = process.env.AI_MODEL || 'big-pickle';
   const visionModel = process.env.AI_VISION_MODEL || model;
 
-  const lastUser = [...safeMessages].reverse().find((m) => m.role === 'user')?.content || '';
   let liveContext = '';
   const lower = lastUser.toLowerCase();
-  const wantsWeather = /\b(weather|temperature|forecast|rain|humidity|wind|hot|cold|sunny|cloudy|मौसम|तापमान|बारिश|वातावरणం|ఉష్ణోగ్రత|వర్షం)\b/.test(lower);
-  const wantsNews = /\b(news|headlines|latest|happening|breaking|article|समाचार|खबर|వార్తలు|తాజా)\b/.test(lower);
+  const wantsWeather = /\\b(weather|temperature|forecast|rain|humidity|wind|hot|cold|sunny|cloudy)\\b|मौसम|तापमान|बारिश|వాతావరణం|ఉష్ణోగ్రత|వర్షం/u.test(lower);
+  const wantsNews = /\\b(news|headlines|latest|happening|breaking|article)\\b|समाचार|खबर|వార్తలు|తాజా/u.test(lower);
   if (wantsWeather) {
-    const weatherLoc = (typeof locationHint === 'string' && locationHint.trim()) ? locationHint : DEFAULT_WEATHER_LOCATION;
+    const weatherLoc = locationHint.trim() || DEFAULT_WEATHER_LOCATION;
     const w = await fetchWeather(weatherLoc);
-    liveContext += `\nLive weather result: ${JSON.stringify({ ok: w.ok, configured: w.configured, error: w.error, message: w.message, data: w.data, retryAfterSec: w.retryAfterSec })}`;
+    liveContext += `\\nLive weather result: ${JSON.stringify({ ok: w.ok, configured: w.configured, error: w.error, message: w.message, data: w.data, retryAfterSec: w.retryAfterSec })}`;
   }
   if (wantsNews) {
-    const m = lower.match(/\b(?:news|headlines|happening)\b(?:\s+(?:about|on|in|for))?\s+(.+)/i);
-    const topic = (m?.[1] || locationHint || 'technology OR India').replace(/[?.!]+$/, '').slice(0, 80);
+    const topic = locationHint.trim() || 'technology OR India';
     const n = await fetchNews(topic);
-    liveContext += `\nLive news result: ${JSON.stringify({ ok: n.ok, configured: n.configured, error: n.error, message: n.message, data: n.data, retryAfterSec: n.retryAfterSec })}`;
+    liveContext += `\\nLive news result: ${JSON.stringify({ ok: n.ok, configured: n.configured, error: n.error, message: n.message, data: n.data, retryAfterSec: n.retryAfterSec })}`;
   }
 
   if (!apiKey) {
-    return res.status(200).json(fallbackResponse(lastUser, language, 'AI_NOT_CONFIGURED'));
+    return res.status(503).json(fallbackResponse(lastUser, responseLanguage, 'AI_NOT_CONFIGURED'));
   }
 
   try {
-    const hasImage = typeof imageDataUrl === 'string' && imageDataUrl.startsWith('data:image/');
-    const system = buildSystemPrompt(language, autoDetect, {
+    const hasImage = imageDataUrl.startsWith('data:image/');
+    const system = buildSystemPrompt(responseLanguage, autoDetect, {
       mode,
-      memories: Array.isArray(memories) ? memories.filter((m) => typeof m === 'string').slice(0, 8) : [],
-      documentText: typeof documentText === 'string' ? documentText.slice(0, 12000) : '',
+      memories: memories.filter((m) => typeof m === 'string').slice(0, 8),
+      documentText: documentText.slice(0, 12000),
       imageAttached: hasImage,
-      location: typeof locationHint === 'string' ? locationHint.slice(0, 120) : '',
-    }) + (liveContext ? `\n${liveContext}` : '');
+      location: locationHint.slice(0, 120),
+    }) + (liveContext ? `\\n${liveContext}` : '');
 
-    const chatMessages = [{ role: 'system', content: system }];
-    for (const m of safeMessages.slice(0, -1)) chatMessages.push(m);
+    const chatMessages = [{ role: 'system', content: system }, ...safeMessages.slice(0, -1)];
     if (hasImage) {
-      chatMessages.push({
-        role: 'user',
-        content: [
-          { type: 'text', text: lastUser || 'Please analyze this image.' },
-          { type: 'image_url', image_url: { url: imageDataUrl } },
-        ],
-      });
-    } else if (lastUser) {
+      chatMessages.push({ role: 'user', content: [
+        { type: 'text', text: lastUser },
+        { type: 'image_url', image_url: { url: imageDataUrl } },
+      ] });
+    } else {
       chatMessages.push({ role: 'user', content: lastUser });
     }
 
-    const response = await fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: hasImage ? visionModel : model,
-        temperature: 0.7,
-        messages: chatMessages,
-      }),
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 40000);
+    let response;
+    try {
+      response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify({ model: hasImage ? visionModel : model, temperature: 0.7, messages: chatMessages }),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
 
     if (!response.ok) {
       const errText = await response.text().catch(() => '');
@@ -300,14 +342,13 @@ app.post('/api/chat', async (req, res) => {
       try { providerError = JSON.parse(errText)?.error || {}; } catch { /* ignore */ }
       const safeProviderMessage = typeof providerError.message === 'string' ? providerError.message.slice(0, 300) : `Upstream status ${response.status}`;
       const safeCode = typeof providerError.code === 'string' ? providerError.code : (typeof providerError.type === 'string' ? providerError.type : undefined);
-      let reason = 'AI_UPSTREAM_ERROR';
-      if (response.status === 401 || response.status === 403) reason = 'AI_AUTH_ERROR';
-      else if (response.status === 429) reason = 'AI_RATE_LIMITED';
-      else if (response.status === 404) reason = 'AI_MODEL_OR_ENDPOINT_ERROR';
-      else if (response.status === 400) reason = 'AI_BAD_REQUEST';
-      console.error('AI API error', { status: response.status, type: providerError.type, code: safeCode, message: safeProviderMessage });
-      return res.status(200).json({
-        ...fallbackResponse('', language, reason),
+      const reason = response.status === 401 || response.status === 403 ? 'AI_AUTH_ERROR'
+        : response.status === 429 ? 'AI_RATE_LIMITED'
+        : response.status === 404 ? 'AI_MODEL_OR_ENDPOINT_ERROR'
+        : response.status === 400 ? 'AI_BAD_REQUEST' : 'AI_UPSTREAM_ERROR';
+      console.error('AI API error', { status: response.status, code: safeCode, message: safeProviderMessage });
+      return res.status(502).json({
+        ...fallbackResponse('', responseLanguage, reason),
         providerStatus: response.status,
         providerCode: safeCode,
         providerMessage: safeProviderMessage,
@@ -315,32 +356,31 @@ app.post('/api/chat', async (req, res) => {
     }
 
     const data = await response.json();
-    const content = data?.choices?.[0]?.message?.content || '';
-    const parsed = extractJson(content);
-
-    if (parsed && typeof parsed.reply === 'string') {
-      const detected = ['te-IN', 'hi-IN', 'en-IN'].includes(parsed.detectedLanguage)
-        ? parsed.detectedLanguage
-        : language;
-      const suggestions = Array.isArray(parsed.suggestions)
-        ? parsed.suggestions.filter((s) => typeof s === 'string').slice(0, 4)
-        : [];
-      return res.json({
-        reply: parsed.reply,
-        detectedLanguage: detected,
-        suggestions,
-        memoryCandidate: typeof parsed.memoryCandidate === 'string' ? parsed.memoryCandidate.slice(0, 240) : undefined,
-      });
+    const rawContent = data?.choices?.[0]?.message?.content ?? data?.output_text ?? data?.reply ?? '';
+    const content = Array.isArray(rawContent)
+      ? rawContent.map((part) => typeof part === 'string' ? part : (part?.text || '')).join('\\n').trim()
+      : typeof rawContent === 'string' ? rawContent.trim() : '';
+    if (!content) {
+      console.error('AI provider returned an empty completion', { model, responseId: data?.id });
+      return res.status(502).json(fallbackResponse('', responseLanguage, 'AI_SERVICE_UNAVAILABLE'));
     }
 
+    const parsed = extractJson(content);
+    const reply = parsed && typeof parsed.reply === 'string' ? parsed.reply.trim() : content;
+    const detectedLanguage = parsed && ['te-IN', 'hi-IN', 'en-IN'].includes(parsed.detectedLanguage)
+      ? parsed.detectedLanguage : responseLanguage;
+    const suggestions = parsed && Array.isArray(parsed.suggestions)
+      ? parsed.suggestions.filter((s) => typeof s === 'string').slice(0, 4) : [];
     return res.json({
-      reply: content || fallbackResponse('', language).reply,
-      detectedLanguage: language,
-      suggestions: [],
+      reply,
+      detectedLanguage,
+      suggestions,
+      memoryCandidate: parsed && typeof parsed.memoryCandidate === 'string' ? parsed.memoryCandidate.slice(0, 240) : undefined,
     });
   } catch (error) {
-    console.error('Chat error', error);
-    return res.status(200).json(fallbackResponse('', language, 'AI_SERVICE_UNAVAILABLE'));
+    const timedOut = error?.name === 'AbortError';
+    console.error('Chat request failed:', timedOut ? 'AI provider timeout' : error);
+    return res.status(502).json(fallbackResponse('', responseLanguage, 'AI_SERVICE_UNAVAILABLE'));
   }
 });
 
@@ -353,15 +393,21 @@ app.get('*', (req, res, next) => {
   });
 });
 
-const server = app.listen(PORT, () => {
-  console.log(`SWAR AI server running on http://localhost:${PORT}`);
-});
+// Vercel invokes the Express app as a serverless function; local Node deployments
+// still start the HTTP listener normally.
+export default app;
 
-server.on('error', (err) => {
-  if (err && err.code === 'EADDRINUSE') {
-    console.error(`Port ${PORT} is already in use. Stop the existing process using that port, or set PORT in .env to a free port.`);
+if (!process.env.VERCEL) {
+  const server = app.listen(PORT, () => {
+    console.log(`SWAR AI server running on http://localhost:${PORT}`);
+  });
+
+  server.on('error', (err) => {
+    if (err && err.code === 'EADDRINUSE') {
+      console.error(`Port ${PORT} is already in use. Stop the existing process using that port, or set PORT in .env to a free port.`);
+      process.exit(1);
+    }
+    console.error('Server listen error:', err);
     process.exit(1);
-  }
-  console.error('Server listen error:', err);
-  process.exit(1);
-});
+  });
+}
