@@ -26,3 +26,7 @@ Thumbs.db
 # Temp
 *.tmp
 *.temp
+
+# TypeScript build info
+*.tsbuildinfo
+
