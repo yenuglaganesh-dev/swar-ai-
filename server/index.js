@@ -101,6 +101,26 @@ function fallbackResponse(_message, language, reason = 'AI_SERVICE_UNAVAILABLE')
       'hi-IN': 'AI प्रदाता ने त्रुटि लौटाई। AI_API_KEY, AI_API_URL, मॉडल एक्सेस और सर्वर लॉग जांचें।',
       'te-IN': 'AI ప్రొవైడర్ లోపాన్ని తిరిగి ఇచ్చింది. AI_API_KEY, AI_API_URL, మోడల్ యాక్సెస్ మరియు సర్వర్ లాగ్‌లను తనిఖీ చేయండి.',
     },
+    AI_AUTH_ERROR: {
+      'en-IN': 'The AI provider rejected the API key. Check that AI_API_KEY is valid and has access to the selected model.',
+      'hi-IN': 'AI सेवा ने API key अस्वीकार कर दी। जाँचें कि AI_API_KEY सही है और चुने गए मॉडल की अनुमति है।',
+      'te-IN': 'AI ప్రొవైడర్ API key‌ను తిరస్కరించింది. AI_API_KEY సరైనదో మరియు ఎంచుకున్న మోడల్‌కు అనుమతి ఉందో తనిఖీ చేయండి.',
+    },
+    AI_RATE_LIMITED: {
+      'en-IN': 'The AI provider rate limit or quota has been reached. Please wait and try again.',
+      'hi-IN': 'AI सेवा की अनुरोध सीमा या कोटा पूरा हो गया है। कृपया थोड़ी देर बाद फिर प्रयास करें।',
+      'te-IN': 'AI ప్రొవైడర్ అభ్యర్థన పరిమితి లేదా కోటా పూర్తయింది. కొద్దిసేపటి తర్వాత మళ్లీ ప్రయత్నించండి.',
+    },
+    AI_MODEL_OR_ENDPOINT_ERROR: {
+      'en-IN': 'The configured AI model or API endpoint was not found. Check AI_MODEL and AI_API_URL.',
+      'hi-IN': 'कॉन्फ़िगर किया गया AI मॉडल या API endpoint नहीं मिला। AI_MODEL और AI_API_URL जाँचें।',
+      'te-IN': 'కాన్ఫిగర్ చేసిన AI మోడల్ లేదా API endpoint కనబడలేదు. AI_MODEL మరియు AI_API_URL తనిఖీ చేయండి.',
+    },
+    AI_BAD_REQUEST: {
+      'en-IN': 'The AI provider rejected the request format. Check the selected model and API compatibility.',
+      'hi-IN': 'AI सेवा ने अनुरोध का प्रारूप अस्वीकार किया। चुने गए मॉडल और API compatibility जाँचें।',
+      'te-IN': 'AI ప్రొవైడర్ అభ్యర్థన ఫార్మాట్‌ను తిరస్కరించింది. ఎంచుకున్న మోడల్ మరియు API compatibility తనిఖీ చేయండి.',
+    },
     AI_SERVICE_UNAVAILABLE: {
       'en-IN': "I'm having trouble reaching the AI service right now. Please check the server configuration and try again.",
       'hi-IN': 'अभी AI सेवा तक पहुंचने में समस्या हो रही है। कृपया सर्वर कॉन्फ़िगरेशन जांचें और फिर प्रयास करें।',
