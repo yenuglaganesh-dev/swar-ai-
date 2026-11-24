@@ -1,59 +1,66 @@
-# SWAR AI Architecture
+# SWAR AI — Architecture
 
 ## Overview
 
-SWAR AI is a full-stack web application with a React/Vite frontend and an Express backend. The backend proxies AI chat requests to OpenCode Inference, provides optional weather/news endpoints, and serves production static files. Supabase is used for authentication and user data storage.
+SWAR AI is a full-stack web application with a React + TypeScript frontend and an Express backend. The frontend handles UI, routing, speech recognition/synthesis, and Supabase client interactions. The backend exposes API endpoints for chat, weather, and news, and proxies AI requests to OpenCode Inference.
 
-## High-Level Architecture
+## System Architecture
 
 ```mermaid
-flowchart TD
-    U[User Browser] --> FE[Frontend: React + TypeScript + Vite]
-    FE --> SR[Web Speech API\nSpeechRecognition]
-    FE --> TS[Browser SpeechSynthesis]
-    FE -->|POST /api/chat| API[Express API Server]
-    FE -->|POST /api/weather, /api/news| API
-    FE -->|Auth, profile, conversations, memories| SB[Supabase Auth + Postgres]
-    API -->|OpenAI-compatible chat completions| OAI[OpenCode Inference]
-    API -->|Current weather| OW[OpenWeatherMap]
-    API -->|Headlines/search| N[NewsAPI]
-    SB --> RLS[RLS Policies]
-    API -->|Production: serve dist/| FE
+flowchart LR
+    U[User / Browser] --> FE[Frontend\nReact + TypeScript + Vite]
+    FE -->|Voice input| SR[Web SpeechRecognition API]
+    FE -->|Speech output| TTS[Browser SpeechSynthesis API]
+    FE -->|POST /api/chat\nPOST /api/weather\nPOST /api/news| BE[Backend\nNode.js + Express]
+    FE -->|Auth/Session/Data| SB[(Supabase\nAuth + Postgres + RLS)]
+    BE -->|Chat Completions| AI[OpenCode Inference API]
+    BE -->|Optional| OW[OpenWeatherMap API]
+    BE -->|Optional| N[NewsAPI]
+    BE -->|Production static files| DIST[dist/]
 ```
 
-## Frontend
+## Frontend Architecture
 
-- **Entry:** `src/main.tsx`, `src/App.tsx`
-- **Routes:** `/`, `/assistant`, `/auth`, `/profile` (protected), `/dashboard` (protected)
-- **State/contexts:** `AuthContext`, `LanguageContext`, `SettingsContext`
-- **Key services:** `aiAssistant.ts`, `speechRecognition.ts`, `speechSynthesis.ts`, `supabase.ts`, `supabaseAuth.ts`, `dataStore.ts`, `safeStorage.ts`
-- **UI:** Marketing sections, assistant chat/voice interface, auth/profile/dashboard pages, reusable `SwarAICircle`.
+| Area | Implementation | Location |
+|---|---|---|
+| App bootstrap | React app mounted with providers | `src/main.tsx` |
+| Routing | React Router routes and protected route wrapper | `src/App.tsx` |
+| Pages | Home, Assistant, Auth, Profile, Dashboard | `src/pages/` |
+| UI components | Layout, marketing, voice assistant, mascot | `src/components/` |
+| State/context | Auth, language, settings contexts | `src/context/` |
+| Services | AI API, speech recognition/synthesis, Supabase, data store, safe storage | `src/services/` |
+| i18n | Translation dictionary and language context | `src/i18n/translations.ts`, `src/context/LanguageContext.tsx` |
+| Styling | Global dark theme CSS | `src/styles/global.css` |
 
-## Backend
+## Backend Architecture
 
-- **Entry:** `server/index.js`
-- **Endpoints:**
-  - `GET /api/health` — configuration/status
-  - `POST /api/chat` — validates input, adds prompt/context, calls OpenCode Inference, returns structured response
-  - `POST /api/weather` — optional OpenWeatherMap integration
-  - `POST /api/news` — optional NewsAPI integration
-- **Behavior:** rate limiting, JSON extraction/fallback handling, safe error mapping, production static serving from `dist/`.
+| Area | Implementation | Location |
+|---|---|---|
+| Server entry | Express app, middleware, routes, static serving | `server/index.js` |
+| Chat endpoint | Validates messages, builds prompt, calls OpenCode Inference | `POST /api/chat` |
+| Weather endpoint | Optional OpenWeatherMap proxy with rate limiting | `POST /api/weather` |
+| News endpoint | Optional NewsAPI proxy with rate limiting | `POST /api/news` |
+| Health endpoint | Configuration/runtime status | `GET /api/health` |
+| Error handling | Structured fallback responses and provider error mapping | `server/index.js` |
 
-## Supabase
+## Data and Authentication
 
-- **Schema:** `supabase/schema.sql`
-- **Tables:** `profiles`, `conversations`, `messages`, `memories`, `usage_events`
-- **Security:** Row Level Security policies restrict user-owned rows; auth user IDs are used as ownership keys.
+- **Supabase Auth:** email/password, Google OAuth initiation, password reset flows in frontend services.
+- **Supabase DB:** schema in `supabase/schema.sql` defines `profiles`, `conversations`, `messages`, `memories`, `usage_events` with RLS policies.
+- **Protected routes:** `/profile` and `/dashboard` require authenticated user in `App.tsx`.
 
-## Environment Configuration
+## Request Flow (Chat)
 
-- Frontend Supabase vars: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
-- Backend AI vars: `AI_API_KEY`, `AI_API_URL`, `AI_MODEL`, `AI_VISION_MODEL`
-- Optional external APIs: `WEATHER_API_KEY`, `NEWS_API_KEY`, `DEFAULT_WEATHER_LOCATION`
+1. User enters text or speech is transcribed in browser.
+2. Frontend sends `POST /api/chat` with messages, language, mode, and optional context.
+3. Backend builds system prompt and calls OpenCode Inference Chat Completions.
+4. Backend parses/normalizes response to JSON (`reply`, `detectedLanguage`, `suggestions`, optional `memoryCandidate`).
+5. Frontend renders response and optionally uses SpeechSynthesis for audio output.
 
-## Known Constraints
+## Security Considerations
 
-- Real AI responses require valid OpenCode Inference credentials and model access.
-- SpeechRecognition/SpeechSynthesis behavior depends on browser support and permissions.
-- Google OAuth requires Supabase provider enablement and correct Google Cloud redirect configuration.
-- Weather/news require valid third-party API keys and are subject to external rate limits.
+- AI provider keys are read from backend environment variables.
+- Frontend uses Supabase publishable/anon key only.
+- `.env` is ignored by Git; `.env.example` uses placeholders.
+- Supabase RLS policies restrict user-owned data access.
+- External API endpoints include basic in-memory rate limiting.

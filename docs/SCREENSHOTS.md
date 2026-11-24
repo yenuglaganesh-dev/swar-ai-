@@ -1,98 +1,91 @@
-# SWAR AI Screenshots
+# SWAR AI — Application Screenshots
 
 Screenshots captured from the local development build on **November 24, 2026**.
 
 - **Tool:** Puppeteer Core + Microsoft Edge (headless)
-- **Desktop viewport:** 1440x900
-- **Mobile viewport:** 390x844 (device scale 2)
-- **App URL:** `http://localhost:5173`
-- **Note:** `/profile` and `/dashboard` are protected routes. Without an authenticated session, the app correctly redirects to `/auth`; screenshots capture this real behavior.
+- **Viewport:** 1440x900 (desktop/laptop)
+- **Application URL:** `http://localhost:5173`
+- **Notes:**
+  - `/profile` and `/dashboard` are protected routes. Without an authenticated session, the application redirects to `/auth`; screenshots document this actual behavior.
+  - No credentials, API keys, or private user data are exposed.
+  - Only desktop/laptop screenshots are included.
 
-## Desktop
+## 01. Homepage
 
-### 01. Homepage
-![Homepage](screenshots/desktop/01-homepage.png)
+![SWAR AI Homepage](screenshots/01-homepage.png)
+
 - **Route:** `/`
-- **Description:** Marketing homepage introducing SWAR AI, voice-first multilingual positioning, hero CTA, and product sections.
-- **Main elements:** Navbar, hero section with `SwarAICircle`, CTA buttons, feature/marketing sections, footer.
+- **Purpose:** Introduce SWAR AI and provide entry points to the assistant and authentication flows.
+- **Visible functionality:** Navigation bar, hero section with animated `SwarAICircle`, project tagline, call-to-action buttons, marketing sections (about/problem/features/stats/how-it-works/tech/preview/CTA), and footer.
 
-### 02. AI Assistant
-![AI Assistant](screenshots/desktop/02-ai-assistant.png)
+## 02. AI Assistant
+
+![SWAR AI Assistant](screenshots/02-ai-assistant.png)
+
 - **Route:** `/assistant`
-- **Description:** Main assistant interface for text/voice interaction.
-- **Main elements:** Assistant orb/circle area, status bar, chat panel, microphone control, text input, settings/language controls.
+- **Purpose:** Main conversational interface for text and voice interaction.
+- **Visible functionality:** Assistant orb/circle, status bar, conversation panel, microphone control, text input, suggestion chips area, settings/language controls, and navigation.
 
-### 03. Assistant Chat Input
-![Assistant Chat Input](screenshots/desktop/03-chat-input.png)
+## 03. Assistant Chat Input
+
+![Assistant Chat Input](screenshots/03-chat-input.png)
+
 - **Route:** `/assistant`
-- **Description:** Assistant page with text input focused/ready for user message.
-- **Main elements:** Chat input, send/control area, assistant conversation UI.
+- **Purpose:** Shows the assistant interface with user text input interaction.
+- **Visible functionality:** Chat input field, assistant UI controls, and conversation layout.
 
-### 04. Language Selector
-![Language Selector](screenshots/desktop/04-language-selector.png)
+## 04. Language Selector
+
+![Language Selector](screenshots/04-language-selector.png)
+
 - **Route:** `/assistant`
-- **Description:** Language selection UI on assistant experience.
-- **Main elements:** Language selector control and assistant interface.
+- **Purpose:** Language selection for assistant interaction.
+- **Visible functionality:** Language selector control and assistant interface context.
 
-### 05. Assistant Settings
-![Assistant Settings](screenshots/desktop/05-assistant-settings.png)
+## 05. Assistant Settings
+
+![Assistant Settings](screenshots/05-assistant-settings.png)
+
 - **Route:** `/assistant`
-- **Description:** Assistant settings panel/state.
-- **Main elements:** Settings controls for assistant preferences.
+- **Purpose:** Configure assistant behavior and user preferences.
+- **Visible functionality:** Settings panel with assistant/user preference controls.
 
-### 06. Login
-![Login](screenshots/desktop/06-login.png)
+## 06. Login
+
+![Login](screenshots/06-login.png)
+
 - **Route:** `/auth`
-- **Description:** Authentication page with sign-in form and auth options.
-- **Main elements:** Email/password fields, sign-in action, Google sign-in button, forgot password/create account links, `SwarAICircle` visual.
+- **Purpose:** Authenticate existing users.
+- **Visible functionality:** Email/password fields, sign-in action, Google sign-in button, forgot-password link, create-account link, and auth visual with `SwarAICircle`.
 
-### 07. Registration
-![Registration](screenshots/desktop/07-registration.png)
+## 07. Registration
+
+![Registration](screenshots/07-registration.png)
+
 - **Route:** `/auth` (signup mode)
-- **Description:** Account creation state in authentication UI.
-- **Main elements:** Name/email/password inputs, create account action, auth navigation.
+- **Purpose:** Create a new account.
+- **Visible functionality:** Name/email/password registration form, sign-up action, and navigation to sign-in.
 
-### 08. Forgot Password
-![Forgot Password](screenshots/desktop/08-forgot-password.png)
+## 08. Forgot Password
+
+![Forgot Password](screenshots/08-forgot-password.png)
+
 - **Route:** `/auth` (reset mode)
-- **Description:** Password reset request state.
-- **Main elements:** Email input, reset action, navigation back to sign-in.
+- **Purpose:** Request password reset email.
+- **Visible functionality:** Email input, reset action, and navigation back to sign-in.
 
-### 09. Profile Route (Redirect Behavior)
-![Profile Redirect](screenshots/desktop/09-profile-or-auth-redirect.png)
+## 09. Profile Route (Protected Redirect)
+
+![Profile Redirect](screenshots/09-profile-or-auth-redirect.png)
+
 - **Route:** `/profile` (protected)
-- **Description:** Real behavior when unauthenticated: route redirects to auth page.
-- **Main elements:** Auth page shown after protected-route redirect.
+- **Purpose:** User profile/settings page for authenticated users.
+- **Captured state:** Unauthenticated access redirects to `/auth`. Screenshot documents actual redirect behavior because no authenticated demo session was used.
 
-### 10. Dashboard Route (Redirect Behavior)
-![Dashboard Redirect](screenshots/desktop/10-dashboard-or-auth-redirect.png)
+## 10. Dashboard Route (Protected Redirect)
+
+![Dashboard Redirect](screenshots/10-dashboard-or-auth-redirect.png)
+
 - **Route:** `/dashboard` (protected)
-- **Description:** Real behavior when unauthenticated: route redirects to auth page.
-- **Main elements:** Auth page shown after protected-route redirect.
-
-## Mobile
-
-### 01. Homepage (Mobile)
-![Homepage Mobile](screenshots/mobile/01-homepage-mobile.png)
-- **Route:** `/`
-- **Description:** Mobile responsive homepage layout.
-
-### 02. AI Assistant (Mobile)
-![AI Assistant Mobile](screenshots/mobile/02-ai-assistant-mobile.png)
-- **Route:** `/assistant`
-- **Description:** Mobile assistant interface.
-
-### 03. Login (Mobile)
-![Login Mobile](screenshots/mobile/03-login-mobile.png)
-- **Route:** `/auth`
-- **Description:** Mobile login/auth layout.
-
-### 04. Registration (Mobile)
-![Registration Mobile](screenshots/mobile/04-registration-mobile.png)
-- **Route:** `/auth` (signup mode)
-- **Description:** Mobile registration state.
-
-### 05. Assistant Settings (Mobile)
-![Assistant Settings Mobile](screenshots/mobile/05-assistant-settings-mobile.png)
-- **Route:** `/assistant`
-- **Description:** Mobile assistant settings state.
+- **Purpose:** User dashboard for conversations/memories/usage/privacy controls.
+- **Captured state:** Unauthenticated access redirects to `/auth`. Screenshot documents actual redirect behavior because no authenticated demo session was used.

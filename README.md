@@ -1,407 +1,444 @@
 # SWAR AI
 
-> **Your Voice. Your Language. Your Intelligence.**  
-> *Everyone Deserves to Be Heard.*
+> **Your Voice. Your Language. Your Intelligence.**
 
-[![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white)](https://react.dev/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Vite](https://img.shields.io/badge/Vite-6-646CFF?logo=vite&logoColor=white)](https://vite.dev/)
-[![Node.js](https://img.shields.io/badge/Node.js-Express-339933?logo=node.js&logoColor=white)](https://expressjs.com/)
-[![Supabase](https://img.shields.io/badge/Supabase-Auth%20%26%20Database-3ECF8E?logo=supabase&logoColor=white)](https://supabase.com/)
-[![OpenCode Inference](https://img.shields.io/badge/AI-OpenCode%20Inference-FF6B35)](https://opencode.ai/)
-
-SWAR AI is a voice-first, multilingual AI assistant web application built with React, TypeScript, Express, Supabase, and OpenCode Inference. It is designed to make AI interaction more accessible through text and voice, with support for English, Telugu, and Hindi.
-
-**Repository:** [yenuglaganesh-dev/swar-ai-](https://github.com/yenuglaganesh-dev/swar-ai-)
+SWAR AI is a multilingual, voice-first AI assistant web application designed to make AI interaction more accessible through natural language and voice. The repository contains a React + TypeScript frontend, an Express backend, Supabase authentication/data integration, and OpenCode Inference chat integration.
 
 ---
 
 ## Table of Contents
 
-- [About SWAR AI](#about-swar-ai)
 - [Project Overview](#project-overview)
 - [Problem Statement](#problem-statement)
 - [Proposed Solution](#proposed-solution)
-- [Project Objectives](#project-objectives)
 - [Key Features](#key-features)
 - [Application Screenshots](#application-screenshots)
-- [Page-by-Page Documentation](#page-by-page-documentation)
-- [How the System Works](#how-the-system-works)
-- [System Architecture](#system-architecture)
 - [Technology Stack](#technology-stack)
-- [Project Structure](#project-structure)
-- [Installation Guide](#installation-guide)
-- [Environment Variables](#environment-variables)
-- [Frontend Setup](#frontend-setup)
-- [Backend Setup](#backend-setup)
-- [Supabase Configuration](#supabase-configuration)
-- [OpenCode AI Integration](#opencode-ai-integration)
-- [Voice Processing](#voice-processing)
-- [Language Support](#language-support)
+- [System Architecture](#system-architecture)
+- [Application Workflow](#application-workflow)
+- [Project Directory Structure](#project-directory-structure)
+- [Frontend Architecture](#frontend-architecture)
+- [Backend Architecture](#backend-architecture)
+- [API Integration](#api-integration)
+- [Database and Authentication](#database-and-authentication)
+- [Environment Configuration](#environment-configuration)
+- [Installation and Setup](#installation-and-setup)
+- [Running the Application](#running-the-application)
+- [Available Scripts](#available-scripts)
+- [API Endpoints](#api-endpoints)
 - [Security and Privacy](#security-and-privacy)
-- [Current Implementation Status](#current-implementation-status)
-- [Future Roadmap](#future-roadmap)
-- [Developer Profile](#developer-profile)
-- [Repository Information](#repository-information)
-- [Contribution Guidelines](#contribution-guidelines)
+- [Current Limitations](#current-limitations)
+- [Future Enhancements](#future-enhancements)
+- [Developer Information](#developer-information)
+- [Contributing](#contributing)
 - [License](#license)
 
 ---
 
-## About SWAR AI
-
-SWAR AI is a full-stack AI assistant project focused on voice-first interaction and multilingual accessibility. The application combines a React frontend, an Express API backend, Supabase authentication/data services, and OpenCode Inference for chat completions. The interface uses a dark, orange-accented visual identity and includes a reusable animated `SwarAICircle` component used on key pages.
-
 ## Project Overview
 
-| Area | Details |
+| Field | Details |
 |---|---|
-| **Project name** | SWAR AI |
+| **Project** | SWAR AI |
 | **Tagline** | Your Voice. Your Language. Your Intelligence. |
-| **Application type** | Full-stack web application |
-| **Frontend** | React 19 + TypeScript + Vite |
-| **Backend** | Node.js + Express |
-| **Authentication/Data** | Supabase |
-| **AI provider integration** | OpenCode Inference Chat Completions API |
-| **Voice** | Web Speech API (SpeechRecognition) + Speech Synthesis |
-| **Supported UI/assistant languages** | English (`en-IN`), Telugu (`te-IN`), Hindi (`hi-IN`) |
+| **Type** | Full-stack web application |
+| **Frontend** | React 19, TypeScript, Vite |
+| **Backend** | Node.js, Express |
+| **AI Integration** | OpenCode Inference Chat Completions API |
+| **Authentication/Data** | Supabase (Auth + Postgres + RLS schema) |
+| **Voice** | Web Speech API (`SpeechRecognition`) and browser `speechSynthesis` |
+| **Languages** | English (`en-IN`), Telugu (`te-IN`), Hindi (`hi-IN`) |
+| **Repository** | [yenuglaganesh-dev/swar-ai-](https://github.com/yenuglaganesh-dev/swar-ai-) |
 
 ## Problem Statement
 
-Many AI interfaces assume users are comfortable typing, reading long responses, or interacting in English. This creates friction for users who prefer voice interaction, users with limited typing comfort, and multilingual users who want to communicate in Telugu or Hindi.
+Many AI interfaces are optimized for text-first, English-first interaction. Users who prefer speaking, have limited typing comfort, or communicate in regional languages can face barriers when using conventional AI assistants.
 
 ## Proposed Solution
 
-SWAR AI provides a voice-first assistant interface with text input fallback, multilingual language selection, speech recognition, text-to-speech output, and an accessible conversational UI. It includes Supabase-based authentication and user data features, while routing AI requests through a backend API to avoid exposing provider keys in the browser.
-
-## Project Objectives
-
-- Provide a voice-first AI assistant experience.
-- Support multilingual interaction in English, Telugu, and Hindi.
-- Offer accessible controls including large microphone interaction, speech output, and simple UI states.
-- Keep AI provider credentials on the backend.
-- Use Supabase for authentication, profiles, conversations, memories, and usage tracking.
-- Present the project as a maintainable, developer-documented repository.
+SWAR AI implements a voice-capable assistant interface with multilingual language support, text input fallback, speech output, and backend-mediated AI requests. It also includes Supabase-based authentication and user data schema for profiles, conversations, memories, and usage events.
 
 ## Key Features
 
-- **Multilingual assistant UI** — Language context and translation files for English, Telugu, and Hindi.
-- **Voice input** — Browser SpeechRecognition integration where supported.
-- **Text-to-speech output** — Browser SpeechSynthesis integration with voice selection heuristics.
-- **AI chat backend** — Express `/api/chat` endpoint proxies requests to OpenCode Inference.
-- **Supabase authentication** — Email/password sign-in, sign-up, Google OAuth initiation, password reset flow.
-- **Protected routes** — Profile and dashboard routes require authenticated user.
-- **User settings** — Language, auto-detect, speech rate, easy mode, continuous mode, memory/history/audio preferences.
-- **Conversation features** — Chat history state, suggestions, conversation persistence hooks, memory candidate handling.
-- **Document/image inputs** — Assistant page includes document upload and camera/image capture UI.
-- **Weather and news endpoints** — Backend endpoints for OpenWeatherMap and NewsAPI when configured.
-- **Animated SwarAICircle** — Reusable SVG/CSS animated AI circle component used on homepage and auth visual.
-- **Responsive layout** — Desktop and mobile layouts with dark SWAR AI theme.
+| Feature | Description | Status |
+|---|---|---|
+| Homepage | Marketing landing page with project sections and CTA | Implemented |
+| AI Assistant page | Chat interface with voice/text controls, status, suggestions, settings | Implemented |
+| Language support | English, Telugu, Hindi language context and translation dictionary | Partially implemented |
+| Speech recognition | Browser SpeechRecognition integration for voice input | Partially implemented (browser-dependent) |
+| Text-to-speech | Browser SpeechSynthesis output with voice selection heuristics | Partially implemented (browser-dependent) |
+| OpenCode AI chat | Backend `/api/chat` proxy to OpenCode Inference | Implemented in code; requires valid API key for live responses |
+| Supabase email/password auth | Sign-in, sign-up, password reset flows | Implemented in code; requires Supabase configuration |
+| Google OAuth | Supabase OAuth initiation for Google provider | Implemented in code; requires Supabase + Google Cloud configuration |
+| Protected routes | `/profile` and `/dashboard` require authenticated user | Implemented |
+| Profile/Dashboard | User settings, history/privacy/memory/usage UI | Implemented in code; authenticated runtime validation required |
+| Weather/News APIs | Backend endpoints for OpenWeatherMap and NewsAPI | Partially implemented; requires API keys and external service availability |
+| Document/Image input | Assistant UI includes document upload and camera/image capture controls | Implemented in UI; end-to-end behavior depends on runtime/browser support |
 
 ## Application Screenshots
 
-> Screenshots were captured from the locally running application on **November 24, 2026** using Microsoft Edge (headless) via Puppeteer. Protected routes (`/profile`, `/dashboard`) redirect to `/auth` when no authenticated session is present; those screenshots document the actual redirect behavior. No credentials, API keys, or private user data are exposed.
+> Desktop/laptop screenshots only (1440x900). Captured from the locally running application on November 24, 2026 using Microsoft Edge (headless) via Puppeteer. No credentials, API keys, or private user data are exposed.
 
-### Desktop Screenshots
+### 01. Homepage
 
-| Page | Preview |
-|---|---|
-| Homepage | ![Homepage](docs/screenshots/desktop/01-homepage.png) |
-| AI Assistant | ![AI Assistant](docs/screenshots/desktop/02-ai-assistant.png) |
-| Assistant Chat Input | ![Chat Input](docs/screenshots/desktop/03-chat-input.png) |
-| Language Selector | ![Language Selector](docs/screenshots/desktop/04-language-selector.png) |
-| Assistant Settings | ![Assistant Settings](docs/screenshots/desktop/05-assistant-settings.png) |
-| Login | ![Login](docs/screenshots/desktop/06-login.png) |
-| Registration | ![Registration](docs/screenshots/desktop/07-registration.png) |
-| Forgot Password | ![Forgot Password](docs/screenshots/desktop/08-forgot-password.png) |
-| Profile Route (redirect behavior) | ![Profile Redirect](docs/screenshots/desktop/09-profile-or-auth-redirect.png) |
-| Dashboard Route (redirect behavior) | ![Dashboard Redirect](docs/screenshots/desktop/10-dashboard-or-auth-redirect.png) |
+![SWAR AI Homepage](docs/screenshots/01-homepage.png)
 
-### Mobile Screenshots
+The homepage presents the SWAR AI product identity, navigation, hero section with animated `SwarAICircle`, and primary call-to-action to launch the assistant.
 
-| Page | Preview |
-|---|---|
-| Homepage (Mobile) | ![Homepage Mobile](docs/screenshots/mobile/01-homepage-mobile.png) |
-| AI Assistant (Mobile) | ![Assistant Mobile](docs/screenshots/mobile/02-ai-assistant-mobile.png) |
-| Login (Mobile) | ![Login Mobile](docs/screenshots/mobile/03-login-mobile.png) |
-| Registration (Mobile) | ![Registration Mobile](docs/screenshots/mobile/04-registration-mobile.png) |
-| Assistant Settings (Mobile) | ![Assistant Settings Mobile](docs/screenshots/mobile/05-assistant-settings-mobile.png) |
+### 02. AI Assistant
 
-## Page-by-Page Documentation
+![SWAR AI Assistant](docs/screenshots/02-ai-assistant.png)
 
-Detailed page descriptions are available in [docs/SCREENSHOTS.md](docs/SCREENSHOTS.md).
+The assistant page provides the main conversational interface, including assistant status/orb, conversation panel, microphone control, text input, and assistant controls.
 
-## How the System Works
+### 03. Assistant Chat Input
 
-1. User opens the SWAR AI frontend.
-2. User interacts by typing or using microphone input.
-3. SpeechRecognition (when available) converts voice to text.
-4. Frontend sends chat requests to the Express backend `/api/chat`.
-5. Backend builds system prompt/context and calls OpenCode Inference Chat Completions.
-6. Backend returns structured response (`reply`, `detectedLanguage`, `suggestions`, optional memory candidate/error details).
-7. Frontend displays the response and can speak it using SpeechSynthesis.
-8. Supabase handles authentication and stores user-related data when configured.
+![Assistant Chat Input](docs/screenshots/03-chat-input.png)
 
-## System Architecture
+The assistant interface with chat input interaction visible, showing the text-entry path alongside the voice-first assistant layout.
 
-```mermaid
-flowchart TD
-    U[User] --> FE[SWAR AI Frontend\nReact + TypeScript + Vite]
-    FE -->|Text/Voice UI| SR[Browser SpeechRecognition]
-    FE -->|Text to Speech| TTS[Browser SpeechSynthesis]
-    FE -->|/api/chat, /api/weather, /api/news| BE[Express Backend]
-    BE -->|Chat Completions| OAI[OpenCode Inference API]
-    BE -->|Weather data| OW[OpenWeatherMap API]
-    BE -->|News data| NEWS[NewsAPI]
-    FE -->|Auth/Session/Profile/Data| SB[Supabase Auth + Postgres + RLS]
-    BE -->|Serves dist in production| FE
-```
+### 04. Language Selector
 
-More details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+![Language Selector](docs/screenshots/04-language-selector.png)
+
+The assistant interface showing the language selection control used for multilingual interaction.
+
+### 05. Assistant Settings
+
+![Assistant Settings](docs/screenshots/05-assistant-settings.png)
+
+The assistant settings panel exposes user-configurable assistant preferences and controls.
+
+### 06. Login
+
+![Login](docs/screenshots/06-login.png)
+
+The authentication page includes email/password sign-in, Google sign-in, password reset, and account creation navigation, alongside the SWAR AI visual panel.
+
+### 07. Registration
+
+![Registration](docs/screenshots/07-registration.png)
+
+The registration state displays account creation fields and actions for new users.
+
+### 08. Forgot Password
+
+![Forgot Password](docs/screenshots/08-forgot-password.png)
+
+The password reset state allows users to request reset instructions by email.
+
+### 09. Profile Route (Protected Redirect)
+
+![Profile Redirect](docs/screenshots/09-profile-or-auth-redirect.png)
+
+`/profile` is a protected route. When accessed without an authenticated session, the application redirects to `/auth`. This screenshot captures that actual behavior.
+
+### 10. Dashboard Route (Protected Redirect)
+
+![Dashboard Redirect](docs/screenshots/10-dashboard-or-auth-redirect.png)
+
+`/dashboard` is a protected route. When accessed without an authenticated session, the application redirects to `/auth`. This screenshot captures that actual behavior.
+
+Additional screenshot details: [docs/SCREENSHOTS.md](docs/SCREENSHOTS.md).
 
 ## Technology Stack
 
-| Category | Technology | Evidence |
+### Verified Technologies
+
+| Layer | Technology | Source |
 |---|---|---|
-| Frontend framework | React 19 | `package.json` |
-| Language | TypeScript | `package.json`, `tsconfig.json`, `.ts/.tsx` sources |
-| Build tool | Vite 6 | `package.json`, `vite.config.ts` |
+| Frontend | React 19, React DOM 19 | `package.json` |
+| Language | TypeScript 5.7 | `package.json`, `tsconfig.json` |
+| Build tool | Vite 6, `@vitejs/plugin-react` | `package.json`, `vite.config.ts` |
 | Routing | React Router DOM 7 | `package.json`, `src/App.tsx` |
 | Animation | Framer Motion | `package.json`, UI components |
 | Icons | Lucide React | `package.json`, UI components |
 | Backend | Node.js, Express 4 | `package.json`, `server/index.js` |
-| AI integration | OpenCode Inference Chat Completions endpoint | `server/index.js`, `.env.example` |
-| Auth/database | Supabase JS + SQL schema | `package.json`, `src/services/supabase*.ts`, `supabase/schema.sql` |
-| Speech recognition | Web Speech API | `src/services/speechRecognition.ts` |
-| Speech synthesis | Browser SpeechSynthesis API | `src/services/speechSynthesis.ts` |
-| External data APIs | OpenWeatherMap, NewsAPI (optional) | `server/index.js`, `.env.example` |
+| API utilities | CORS, dotenv | `package.json`, `server/index.js` |
+| Auth/Data | Supabase JS 2 | `package.json`, `src/services/supabase*.ts` |
+| AI provider | OpenCode Inference Chat Completions endpoint | `server/index.js`, `.env.example` |
+| Voice input | Web Speech API (`SpeechRecognition`/`webkitSpeechRecognition`) | `src/services/speechRecognition.ts` |
+| Voice output | Browser `speechSynthesis` | `src/services/speechSynthesis.ts` |
+| Optional external APIs | OpenWeatherMap, NewsAPI | `server/index.js`, `.env.example` |
 
-## Project Structure
+## System Architecture
+
+```mermaid
+flowchart LR
+    U[User Browser] --> FE[React Frontend\nVite + TypeScript]
+    FE -->|Voice input| SR[Web SpeechRecognition]
+    FE -->|Speech output| TTS[speechSynthesis]
+    FE -->|/api/chat /api/weather /api/news| BE[Express Backend]
+    FE -->|Auth and data| SB[Supabase Auth + Postgres + RLS]
+    BE -->|Chat completions| AI[OpenCode Inference]
+    BE -->|Optional| OW[OpenWeatherMap]
+    BE -->|Optional| NEWS[NewsAPI]
+```
+
+Detailed architecture documentation: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+## Application Workflow
+
+1. User opens the frontend route (`/`, `/assistant`, `/auth`, etc.).
+2. For assistant interaction, user provides text or microphone input.
+3. SpeechRecognition converts speech to text when supported.
+4. Frontend sends chat payload to `POST /api/chat`.
+5. Express backend validates input, applies prompt/context, and calls OpenCode Inference.
+6. Backend returns structured JSON response.
+7. Frontend renders reply and optionally speaks it via SpeechSynthesis.
+8. Supabase handles authentication and user-owned data where configured.
+
+## Project Directory Structure
 
 ```text
 .
 ├── docs/
 │   ├── ARCHITECTURE.md
 │   ├── SCREENSHOTS.md
-│   └── screenshots/
-│       ├── desktop/
-│       └── mobile/
-├── scripts/                    # Development/patch/helper scripts
+│   └── screenshots/            # Desktop/laptop screenshots only
+├── scripts/                    # Local helper/patch/diagnostic scripts
 ├── server/
-│   └── index.js                # Express API, AI proxy, weather/news, static serving
+│   └── index.js                # Express API server
 ├── src/
-│   ├── App.tsx                 # Routes and protected route wrapper
-│   ├── main.tsx                # App bootstrap
-│   ├── components/
-│   │   ├── Auth/               # SwarMascot wrapper
-│   │   ├── Layout/             # Navbar, PageShell, LanguageSelector
-│   │   ├── Marketing/          # Homepage sections
-│   │   ├── Mascot/             # SwarAICircle animated component
-│   │   └── VoiceAssistant/      # Assistant UI components
+│   ├── App.tsx                 # Route definitions and protected route logic
+│   ├── main.tsx                # React bootstrap
+│   ├── components/             # UI components (Layout, Marketing, VoiceAssistant, Mascot, Auth)
 │   ├── context/                # Auth, Language, Settings providers
-│   ├── i18n/                   # translations.ts
+│   ├── i18n/                   # Translation dictionary
 │   ├── pages/                  # Home, Assistant, Auth, Profile, Dashboard
-│   ├── services/               # AI, speech, Supabase, storage, data store
-│   ├── styles/                 # global.css
-│   └── types/                  # shared TypeScript types
+│   ├── services/               # API, speech, Supabase, storage, data store
+│   ├── styles/                 # Global CSS
+│   └── types/                  # TypeScript types
 ├── supabase/
-│   └── schema.sql              # Tables, RLS policies, triggers
-├── .env.example
-├── package.json
-├── tsconfig.json
-├── vite.config.ts
+│   └── schema.sql              # Database schema, RLS policies, triggers
+├── .env.example                # Environment variable template
+├── package.json                # Scripts and dependencies
+├── tsconfig.json               # TypeScript config
+├── vite.config.ts              # Vite config and /api proxy
 └── README.md
 ```
 
-## Installation Guide
+## Frontend Architecture
 
-### Prerequisites
+- **Routing:** `src/App.tsx` defines routes and `ProtectedRoute` for `/profile` and `/dashboard`.
+- **Pages:** `HomePage`, `AssistantPage`, `AuthPage`, `ProfilePage`, `DashboardPage`.
+- **Contexts:** `AuthContext` (Supabase session/user), `LanguageContext` (language/translation), `SettingsContext` (persisted user settings).
+- **Services:** `aiAssistant.ts` for backend API calls; `speechRecognition.ts` and `speechSynthesis.ts` for browser voice APIs; `supabase.ts`/`supabaseAuth.ts` for auth; `dataStore.ts` for user data operations.
+- **UI:** Reusable components including `SwarAICircle`, assistant controls, marketing sections, and layout shells.
 
-- **Node.js** 18+ (recommended: current LTS)
-- **npm** 9+
-- **Git**
-- A modern browser (Chrome/Edge recommended for SpeechRecognition support)
+## Backend Architecture
 
-### Clone
+- **Server:** `server/index.js` (Express, CORS, JSON parsing, rate limiting, static serving).
+- **AI chat:** `POST /api/chat` builds a system prompt, optionally includes memory/document/image/weather/news context, and calls OpenCode Inference.
+- **External data:** `POST /api/weather` (OpenWeatherMap) and `POST /api/news` (NewsAPI) when keys are configured.
+- **Health check:** `GET /api/health` reports service configuration flags.
+- **Production:** serves built frontend from `dist/` when available.
 
-```bash
-git clone https://github.com/yenuglaganesh-dev/swar-ai-.git
-cd swar-ai-
-```
+## API Integration
 
-### Install dependencies
+### OpenCode Inference
 
-```bash
-npm install
-```
+- Configured via `AI_API_KEY`, `AI_API_URL`, `AI_MODEL`, `AI_VISION_MODEL`.
+- Default URL: `https://opencode.ai/inference/openai/v1/chat/completions`.
+- Backend sends `Authorization: Bearer <AI_API_KEY>`.
+- Responses are parsed as JSON; fallback/error states are returned when provider/configuration fails.
 
-### Configure environment
+### Supabase
+
+- Frontend uses `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
+- Auth flows are implemented in `src/services/supabaseAuth.ts`.
+- Database schema and RLS policies are defined in `supabase/schema.sql`.
+
+## Database and Authentication
+
+### Authentication
+
+- Email/password sign-in and sign-up
+- Google OAuth initiation via Supabase
+- Password reset email flow
+- Session persistence via Supabase client auth storage
+- Protected routes in frontend
+
+### Database Tables (Supabase schema)
+
+| Table | Purpose |
+|---|---|
+| `profiles` | User profile/preferences |
+| `conversations` | Conversation metadata |
+| `messages` | Conversation messages |
+| `memories` | User memory items (consent-based feature) |
+| `usage_events` | Usage analytics/events |
+
+RLS policies are defined in `supabase/schema.sql` to restrict access to user-owned rows.
+
+## Environment Configuration
+
+Copy `.env.example` to `.env` and set required values. Do not commit real secrets.
 
 ```bat
 copy .env.example .env
 ```
 
-On macOS/Linux:
-
 ```bash
+# macOS/Linux
 cp .env.example .env
 ```
 
-Fill required values in `.env`. See [Environment Variables](#environment-variables).
-
-## Environment Variables
-
-| Variable | Required | Purpose |
-|---|---:|---|
-| `PORT` | No | Express server port (default `3001`) |
-| `CLIENT_ORIGIN` | No | CORS origin for frontend (default `http://localhost:5173`) |
-| `AI_API_KEY` | For real AI chat | OpenCode Inference API key used by backend |
-| `AI_API_URL` | No | Chat completions endpoint; default OpenCode Inference URL |
-| `AI_MODEL` | No | Model ID; default `big-pickle` |
-| `AI_VISION_MODEL` | No | Vision-capable model for image requests; defaults to `AI_MODEL` |
-| `WEATHER_API_KEY` | Optional | OpenWeatherMap API key for `/api/weather` |
-| `NEWS_API_KEY` | Optional | NewsAPI key for `/api/news` |
+| Variable | Required | Description |
+|---|---|---|
+| `PORT` | No | Backend port (default `3001`) |
+| `CLIENT_ORIGIN` | No | Allowed CORS origin for frontend |
+| `AI_API_KEY` | For live AI | OpenCode Inference API key (backend only) |
+| `AI_API_URL` | No | OpenCode Inference chat completions URL |
+| `AI_MODEL` | No | Model ID for chat |
+| `AI_VISION_MODEL` | No | Model ID for image/vision requests |
+| `WEATHER_API_KEY` | Optional | OpenWeatherMap key |
+| `NEWS_API_KEY` | Optional | NewsAPI key |
 | `DEFAULT_WEATHER_LOCATION` | No | Default weather location |
-| `VITE_SUPABASE_URL` | For Supabase auth/data | Supabase project URL |
-| `VITE_SUPABASE_ANON_KEY` | For Supabase auth/data | Supabase publishable/anon key |
+| `VITE_SUPABASE_URL` | For Supabase | Supabase project URL |
+| `VITE_SUPABASE_ANON_KEY` | For Supabase | Supabase publishable/anon key |
 
-> **Never commit real API keys, Supabase service-role keys, or private credentials.** `.env` is gitignored; `.env.example` should contain placeholders only.
+## Installation and Setup
 
-## Frontend Setup
+### Prerequisites
 
-The frontend runs on Vite (default `http://localhost:5173`) and proxies `/api` to `http://localhost:3001` during development.
+- Node.js 18+ (LTS recommended)
+- npm 9+
+- Git
+- Modern browser (Edge/Chrome recommended for SpeechRecognition support)
 
-```bash
-npm run dev:client
-```
-
-## Backend Setup
-
-The backend runs on Express (default `http://localhost:3001`).
+### Clone and Install
 
 ```bash
-npm run dev:server
+git clone https://github.com/yenuglaganesh-dev/swar-ai-.git
+cd swar-ai-
+npm install
 ```
 
-## Run Both (Development)
+### Configure Environment
+
+Create `.env` from `.env.example` and provide required values.
+
+## Running the Application
+
+### Development (frontend + backend)
 
 ```bash
 npm run dev
 ```
 
-## Production Build
+- Frontend: `http://localhost:5173`
+- Backend: `http://localhost:3001`
+- Vite proxies `/api` to backend (see `vite.config.ts`)
+
+### Frontend only
+
+```bash
+npm run dev:client
+```
+
+### Backend only
+
+```bash
+npm run dev:server
+```
+
+### Production build
 
 ```bash
 npm run build
 npm start
 ```
 
-`npm start` serves `dist/` through Express and exposes API routes.
+## Available Scripts
 
-## Supabase Configuration
+| Command | Description |
+|---|---|
+| `npm run dev` | Runs client and server concurrently |
+| `npm run dev:client` | Starts Vite dev server |
+| `npm run dev:server` | Starts Express server with `node --watch` |
+| `npm run build` | TypeScript build + Vite production build |
+| `npm run preview` | Preview Vite production build |
+| `npm start` | Starts Express server (serves `dist/` in production) |
 
-1. Create a Supabase project.
-2. Copy **Project URL** and **Publishable/Anon key** into `.env`.
-3. In Supabase Authentication settings, configure providers as needed:
-   - Email/password
-   - Google OAuth (requires Google Cloud OAuth client and Supabase provider setup)
-4. Add redirect URLs in Supabase URL Configuration, e.g.:
-   - `http://localhost:5173/assistant`
-   - `http://localhost:5173/auth`
-   - Your production domain equivalents
-5. Run `supabase/schema.sql` in Supabase SQL editor.
-6. Confirm RLS policies are enabled as defined in schema.
+## API Endpoints
 
-## OpenCode AI Integration
+| Method | Route | Purpose | Auth/Config |
+|---|---|---|---|
+| `GET` | `/api/health` | Service health and configuration flags | None |
+| `POST` | `/api/chat` | AI chat completion via OpenCode Inference | Requires `AI_API_KEY` for live AI |
+| `POST` | `/api/weather` | Current weather lookup | Requires `WEATHER_API_KEY` |
+| `POST` | `/api/news` | News lookup | Requires `NEWS_API_KEY` |
 
-- Backend endpoint: `POST /api/chat`
-- Default provider URL: `https://opencode.ai/inference/openai/v1/chat/completions`
-- Default model: `big-pickle` (configured in env)
-- The backend sends chat-completions requests with `Authorization: Bearer <AI_API_KEY>`.
-- If AI key/provider is missing or errors, backend returns structured fallback/error information; the UI displays an error state.
+### Example: `POST /api/chat`
 
-**Validation note:** External AI completion depends on a valid configured `AI_API_KEY` and provider availability/quota. Do not claim real AI responses are working without a successful live test.
+Request:
 
-## Voice Processing
+```json
+{
+  "messages": [{ "role": "user", "content": "Hello" }],
+  "language": "en-IN",
+  "autoDetect": false,
+  "mode": "default"
+}
+```
 
-- **Speech recognition:** `src/services/speechRecognition.ts` uses `window.SpeechRecognition` / `webkitSpeechRecognition`.
-- **Speech synthesis:** `src/services/speechSynthesis.ts` uses `window.speechSynthesis`.
-- Browser support varies; the UI includes fallback messaging and text input.
-- Microphone access requires user permission and secure context/browser support.
+Response (shape):
 
-## Language Support
-
-| Language | Code | Status |
-|---|---|---|
-| English | `en-IN` | Implemented in language settings/translations |
-| Telugu | `te-IN` | Implemented in language settings/translations |
-| Hindi | `hi-IN` | Implemented in language settings/translations |
-
-The project includes a centralized translation file (`src/i18n/translations.ts`) and language context. Complete end-to-end parity across every screen/state should be validated manually.
+```json
+{
+  "reply": "string",
+  "detectedLanguage": "en-IN",
+  "suggestions": ["..."],
+  "memoryCandidate": "optional string"
+}
+```
 
 ## Security and Privacy
 
-- API keys are loaded from environment variables; AI keys are used server-side.
-- Supabase anon/publishable key is used in frontend; service-role keys should never be exposed.
-- `.env` is ignored by git.
-- Supabase schema includes Row Level Security policies for user-owned tables.
-- Do not expose real credentials, tokens, or private user data in screenshots or docs.
+- Do not commit `.env` or real credentials.
+- AI keys are used on the backend; frontend should only use Supabase publishable/anon key.
+- Supabase schema includes RLS policies for user-owned tables.
+- Weather/news endpoints include basic in-memory rate limiting.
+- Screenshots/documentation should not expose personal data or secrets.
 
-## Current Implementation Status
+## Current Limitations
 
-| Feature | Status | Notes |
-|---|---|---|
-| Homepage marketing UI | Implemented | Route `/` with multiple sections |
-| Assistant UI | Implemented | Route `/assistant`, chat/voice/settings controls |
-| Speech recognition integration | Partially implemented | Browser-dependent; requires runtime support/permission |
-| Speech synthesis integration | Partially implemented | Browser voice availability varies |
-| OpenCode AI chat endpoint | Implemented in code | Requires valid `AI_API_KEY` and provider access for live responses |
-| Supabase auth (email/password) | Implemented in code | Requires Supabase project configuration |
-| Google OAuth | Implemented in code | Requires Supabase + Google Cloud provider configuration; provider must be enabled |
-| Password reset | Implemented in code | Requires Supabase email configuration |
-| Profile page | Implemented in code | Protected route; redirects to auth when unauthenticated |
-| Dashboard page | Implemented in code | Protected route; redirects to auth when unauthenticated |
-| Weather endpoint/UI | Partially implemented | Requires `WEATHER_API_KEY`; external API limits apply |
-| News endpoint/UI | Partially implemented | Requires `NEWS_API_KEY`; external API limits apply |
-| EN/TE/HI language system | Partially implemented | Translation infrastructure exists; full UI parity needs manual audit |
-| Reusable SwarAICircle animation | Implemented | Used on homepage and auth visual |
-| Documentation screenshots | Implemented | Real local screenshots captured for available states |
+- Live AI responses depend on valid OpenCode Inference credentials and model availability.
+- Google OAuth requires Supabase provider configuration and correct Google Cloud redirect/callback setup.
+- SpeechRecognition and SpeechSynthesis behavior depends on browser support and permissions.
+- Weather/news features depend on third-party API keys and external rate limits.
+- Protected pages (`/profile`, `/dashboard`) were documented using unauthenticated redirect behavior because no authenticated demo session was used.
+- Full EN/TE/HI UI parity across every screen/state requires manual audit.
 
-## Future Roadmap
+## Future Enhancements
 
-- Complete full EN/TE/HI translation coverage across all components and states.
-- Add verified live end-to-end tests for AI, weather, and news integrations.
-- Improve authenticated screenshot/documentation flow with a safe demo account.
-- Add CI checks for lint/build/docs validation.
-- Expand accessibility audits (keyboard, screen reader, reduced motion).
-- Add deployment documentation for production hosting.
+- Complete and verify EN/TE/HI translations across all UI states.
+- Add automated tests for API and critical UI flows.
+- Add authenticated demo/testing workflow for protected-page screenshots.
+- Add deployment documentation and CI pipeline.
+- Improve accessibility audit coverage (keyboard, screen reader, reduced motion).
 
-## Developer Profile
+## Developer Information
 
-| Field | Value |
+| Field | Details |
 |---|---|
-| **Developer** | Ganesh Yenugula (from git metadata) |
+| **Name** | Ganesh Yenugula (from git metadata) |
 | **GitHub** | [yenuglaganesh-dev](https://github.com/yenuglaganesh-dev) |
 | **Repository** | [swar-ai-](https://github.com/yenuglaganesh-dev/swar-ai-) |
-| **Project role** | Full-Stack Developer / AI Application Developer (based on repository implementation) |
-| **Focus areas** | React + TypeScript frontend, Express backend, Supabase auth/data, AI assistant integration, voice UI |
+| **Project Role** | Full-Stack Developer / AI Application Developer (based on repository implementation) |
+| **Focus** | React + TypeScript frontend, Express backend, Supabase auth/data integration, AI and voice interaction features |
 
-> Only publicly verifiable repository/git metadata is included. No private contact details, claims of employment, certifications, or awards are added.
+Only verifiable repository/git metadata is included.
 
-## Repository Information
-
-- **Default branch:** `main`
-- **Remote:** `https://github.com/yenuglaganesh-dev/swar-ai-.git`
-- **Primary app routes:** `/`, `/assistant`, `/auth`, `/profile` (protected), `/dashboard` (protected)
-
-## Contribution Guidelines
+## Contributing
 
 1. Fork the repository and create a feature branch.
-2. Keep changes focused and documented.
-3. Do not commit secrets or `.env` files.
+2. Keep changes scoped and document behavior changes.
+3. Do not commit `.env` or secrets.
 4. Run `npm run build` before opening a pull request.
-5. Include screenshots/docs updates for UI changes.
+5. Update documentation/screenshots when UI changes.
 
 ## License
 
-No `LICENSE` file is currently included in this repository. Add one if you intend to distribute the project under a specific open-source license.
+No `LICENSE` file is currently present in this repository. Add a license file before distributing under specific open-source terms.
