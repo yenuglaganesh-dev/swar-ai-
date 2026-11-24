@@ -14,6 +14,17 @@ const DEFAULT_WEATHER_LOCATION = process.env.DEFAULT_WEATHER_LOCATION || 'Hydera
 app.use(cors({ origin: CLIENT_ORIGIN, credentials: true }));
 app.use(express.json({ limit: '1mb' }));
 
+// Vercel catch-all functions can expose the path with or without the /api
+// prefix depending on the function route. Normalize it before Express routing.
+if (process.env.VERCEL) {
+  app.use((req, _res, next) => {
+    if (req.path !== '/api' && !req.path.startsWith('/api/')) {
+      req.url = `/api${req.url}`;
+    }
+    next();
+  });
+}
+
 // Simple in-memory rate limiter for external API endpoints (free-plan protection)
 const rateBuckets = new Map();
 function rateLimit(key, limit, windowMs) {
@@ -382,15 +393,21 @@ app.get('*', (req, res, next) => {
   });
 });
 
-const server = app.listen(PORT, () => {
-  console.log(`SWAR AI server running on http://localhost:${PORT}`);
-});
+// Vercel invokes the Express app as a serverless function; local Node deployments
+// still start the HTTP listener normally.
+export default app;
 
-server.on('error', (err) => {
-  if (err && err.code === 'EADDRINUSE') {
-    console.error(`Port ${PORT} is already in use. Stop the existing process using that port, or set PORT in .env to a free port.`);
+if (!process.env.VERCEL) {
+  const server = app.listen(PORT, () => {
+    console.log(`SWAR AI server running on http://localhost:${PORT}`);
+  });
+
+  server.on('error', (err) => {
+    if (err && err.code === 'EADDRINUSE') {
+      console.error(`Port ${PORT} is already in use. Stop the existing process using that port, or set PORT in .env to a free port.`);
+      process.exit(1);
+    }
+    console.error('Server listen error:', err);
     process.exit(1);
-  }
-  console.error('Server listen error:', err);
-  process.exit(1);
-});
+  });
+}
