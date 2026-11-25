@@ -54,10 +54,13 @@ export default function AssistantPage() {
 
   const recognitionRef = useRef<ReturnType<typeof createRecognition> | null>(null);
   const latestTranscriptRef = useRef('');
+  const baseInputRef = useRef('');
   const voiceSubmittedRef = useRef(false);
   const attachMenuRef = useRef<HTMLDivElement | null>(null);
   const photoInputRef = useRef<HTMLInputElement | null>(null);
+  const cameraFallbackRef = useRef<HTMLInputElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [healthStatus, setHealthStatus] = useState<{ aiConfigured?: boolean; weatherConfigured?: boolean; newsConfigured?: boolean } | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -235,12 +238,18 @@ export default function AssistantPage() {
     };
   }, [attachMenuOpen]);
 
+  useEffect(() => {
+    fetch('/api/health').then((r) => r.json()).then((d) => setHealthStatus(d)).catch(() => {});
+  }, []);
+
   const startListening = useCallback(async () => {
     setError(null); stopSpeaking();
+    pendingListenRef.current = false;
     if (!speechRecSupported) { setError(t('micNotSupported')); return; }
 
     recognitionRef.current?.abort();
     cleanupAudio();
+    baseInputRef.current = input.trim();
     latestTranscriptRef.current = '';
     voiceSubmittedRef.current = false;
 
@@ -248,22 +257,26 @@ export default function AssistantPage() {
       onStart: () => setStatus('listening'),
       onEnd: () => {
         cleanupAudio();
-        const pending = latestTranscriptRef.current.trim();
-        if (!voiceSubmittedRef.current && pending) {
+        const spoken = latestTranscriptRef.current.trim();
+        const combined = [baseInputRef.current, spoken].filter(Boolean).join(' ').trim();
+        if (combined) setInput(combined);
+
+        if (continuousRef.current && !voiceSubmittedRef.current && spoken) {
           voiceSubmittedRef.current = true;
-          handleSend(pending);
+          handleSend(combined);
           return;
         }
         if (statusRef.current === 'listening') setStatus('idle');
       },
       onResult: (transcript, isFinal) => {
         latestTranscriptRef.current = transcript;
-        setInput(transcript);
-        if (isFinal && transcript.trim() && !voiceSubmittedRef.current) {
+        const combined = [baseInputRef.current, transcript].filter(Boolean).join(' ').trim();
+        setInput(combined);
+        if (continuousRef.current && isFinal && transcript.trim() && !voiceSubmittedRef.current) {
           voiceSubmittedRef.current = true;
           recognitionRef.current?.stop();
           cleanupAudio();
-          handleSend(transcript);
+          handleSend(combined);
         }
       },
       onError: (err) => {
@@ -280,7 +293,7 @@ export default function AssistantPage() {
     recognitionRef.current = rec;
     rec.start();
 
-    // Optional audio visualizer — never block SpeechRecognition if getUserMedia fails
+    // Audio-reactive Web Audio API AnalyserNode for live waveform
     try {
       if (navigator.mediaDevices?.getUserMedia) {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -296,31 +309,102 @@ export default function AssistantPage() {
       /* Visualizer is optional; SpeechRecognition handles mic input independently */
     }
     await logUsage(user?.uid || null, 'voice_start').catch(() => {});
-  }, [language, speechRecSupported, handleSend, cleanupAudio, t, user]);
+  }, [language, speechRecSupported, input, handleSend, cleanupAudio, t, user]);
   const startListeningRef = useRef(startListening); startListeningRef.current = startListening;
 
-  const stopListening = useCallback(() => { recognitionRef.current?.stop(); cleanupAudio(); setStatus('idle'); }, [cleanupAudio]);
+  const stopListening = useCallback(() => {
+    recognitionRef.current?.stop();
+    cleanupAudio();
+    setStatus('idle');
+  }, [cleanupAudio]);
   const onMicClick = () => {
     if (status === 'listening') stopListening();
-    else if (status === 'speaking') { stopSpeaking(); setStatus('idle'); if (continuousRef.current) setTimeout(() => startListening(), 200); }
+    else if (status === 'speaking') {
+      stopSpeaking();
+      pendingListenRef.current = false;
+      setStatus('idle');
+      setTimeout(() => startListening(), 150);
+    }
     else if (status !== 'processing') startListening();
   };
 
-  const onRepeat = (text?: string) => { const toSpeak = text || lastSpokenRef.current || [...messagesRef.current].reverse().find((m) => m.role === 'assistant')?.content; if (toSpeak) speak(toSpeak, language); };
+  const onRepeat = (text?: string) => {
+    const toSpeak = text || lastSpokenRef.current || [...messagesRef.current].reverse().find((m) => m.role === 'assistant')?.content;
+    if (toSpeak) speak(toSpeak, language);
+    else setError('No assistant response to repeat yet.');
+  };
   const onSimplify = (text: string) => handleSend(`${t('explainSimply')}: ${text}`, 'simple');
   const clearHistory = () => { stopSpeaking(); setMessages([]); safeStorage.removeItem(HISTORY_KEY); setStatus('idle'); convoIdRef.current = null; greetedRef.current = false; setTimeout(() => { greetedRef.current = true; setMessages([{ id: uid(), role: 'assistant', content: t('assistantGreeting'), language, timestamp: Date.now() }]); }, 0); };
 
   const handleDocUpload = async (file: File) => {
+    setError(null);
     const name = file.name.toLowerCase();
     if (name.match(/\.(txt|md|csv|json|js|ts|tsx|py|html|css)$/)) {
       const text = await file.text();
-      setDocText(text.slice(0, 12000)); setDocName(file.name);
-    } else if (name.match(/\.(pdf|doc|docx)$/)) {
-      setDocText(`[Attached document: ${file.name} (${Math.max(1, Math.round(file.size / 1024))} KB). Note: binary PDF/DOCX text extraction is limited in browser; ask the user to paste key text if needed.]`);
+      setDocText(text.slice(0, 12000));
       setDocName(file.name);
-    } else {
-      setError('Supported files: .pdf, .doc, .docx, .txt, .md, .csv, .json, and code files.');
+      return;
     }
+    if (name.endsWith('.docx')) {
+      try {
+        const buf = await file.arrayBuffer();
+        const bytes = new Uint8Array(buf);
+        const view = new DataView(buf);
+        let extracted = '';
+        for (let i = 0; i < bytes.length - 30; i++) {
+          if (view.getUint32(i, true) === 0x04034b50) {
+            const compMethod = view.getUint16(i + 8, true);
+            const compSize = view.getUint32(i + 18, true);
+            const nameLen = view.getUint16(i + 26, true);
+            const extraLen = view.getUint16(i + 28, true);
+            const entryName = new TextDecoder().decode(bytes.slice(i + 30, i + 30 + nameLen));
+            const dataStart = i + 30 + nameLen + extraLen;
+            if (entryName === 'word/document.xml' && compSize > 0 && dataStart + compSize <= bytes.length) {
+              const rawEntry = bytes.slice(dataStart, dataStart + compSize);
+              let xmlText = '';
+              if (compMethod === 0) {
+                xmlText = new TextDecoder().decode(rawEntry);
+              } else if (compMethod === 8 && typeof DecompressionStream !== 'undefined') {
+                const ds = new DecompressionStream('deflate-raw');
+                const writer = ds.writable.getWriter();
+                writer.write(rawEntry);
+                writer.close();
+                xmlText = await new Response(ds.readable).text();
+              }
+              if (xmlText) {
+                extracted = xmlText.replace(/<w:p[^>]*>/g, '\n').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+              }
+              break;
+            }
+          }
+        }
+        setDocText((extracted || `[Attached DOCX: ${file.name} (${Math.max(1, Math.round(file.size / 1024))} KB)]`).slice(0, 12000));
+        setDocName(file.name);
+        return;
+      } catch {
+        /* fallback below */
+      }
+    }
+    if (name.match(/\.(pdf|doc|docx)$/)) {
+      try {
+        const buf = await file.arrayBuffer();
+        const raw = new TextDecoder('latin1').decode(buf);
+        const matches = raw.match(/\(([^()\\]{3,120})\)/g) || [];
+        const textRuns = matches
+          .map((m) => m.slice(1, -1))
+          .filter((s) => /[a-zA-Z0-9\u0900-\u097F\u0C00-\u0C7F]{2}/.test(s))
+          .join(' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+        setDocText((textRuns || `[Attached document: ${file.name} (${Math.max(1, Math.round(file.size / 1024))} KB). Compressed/scanned PDF/DOC text could not be decoded in-browser.]`).slice(0, 12000));
+        setDocName(file.name);
+      } catch {
+        setDocText(`[Attached document: ${file.name}]`);
+        setDocName(file.name);
+      }
+      return;
+    }
+    setError('Supported files: .pdf, .doc, .docx, .txt, .md, .csv, .json, and code files.');
   };
 
   const handlePhotoUpload = (file: File) => {
@@ -340,12 +424,17 @@ export default function AssistantPage() {
 
   const openCamera = async () => {
     setError(null);
-    if (!navigator.mediaDevices?.getUserMedia) { setError(t('cameraNotSupported')); return; }
+    if (!navigator.mediaDevices?.getUserMedia) {
+      cameraFallbackRef.current?.click();
+      return;
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
       cameraStreamRef.current = stream; setCameraOpen(true);
       setTimeout(() => { if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play().catch(() => {}); } }, 50);
-    } catch { setError(t('cameraPermissionDenied')); }
+    } catch {
+      cameraFallbackRef.current?.click();
+    }
   };
   const captureImage = () => {
     const video = videoRef.current; if (!video) return;
@@ -477,14 +566,21 @@ export default function AssistantPage() {
               <div className="tool-row">
                 <button className="btn btn-secondary btn-sm" onClick={() => doWeather(true)} disabled={weatherLoading}><CloudSun size={16} />{weatherLoading ? t('loading') : t('weather')}</button>
                 <button className="btn btn-secondary btn-sm" onClick={() => doNews(undefined, true)} disabled={newsLoading}><Newspaper size={16} />{newsLoading ? t('loading') : t('news')}</button>
-                <button className="btn btn-secondary btn-sm" onClick={() => { stopSpeaking(); setStatus('idle'); }}><MicOff size={16} />{t('stopSpeaking')}</button>
+                <button className="btn btn-secondary btn-sm" onClick={() => { stopSpeaking(); recognitionRef.current?.abort(); cleanupAudio(); pendingListenRef.current = false; setStatus('idle'); }}><MicOff size={16} />{t('stopSpeaking')}</button>
+                <button
+                  className={`btn btn-secondary btn-sm ${continuous ? 'active-toggle' : ''}`}
+                  onClick={() => { const v = !continuous; setContinuous(v); updateSettings({ continuousMode: v }); }}
+                  title="Toggle hands-free voice conversation mode"
+                >
+                  <RotateCcw size={14} /> {continuous ? 'Voice Chat: ON' : 'Voice Chat: OFF'}
+                </button>
                 {thinkHarder && (
                   <button className="btn btn-secondary btn-sm think-badge" onClick={() => setThinkHarder(false)} title="Disable Think Harder">
                     <Sparkles size={14} /> Think Harder ON <X size={13} />
                   </button>
                 )}
               </div>
-              <MicrophoneButton status={status} onClick={onMicClick} disabled={status === 'processing'} />
+              <MicrophoneButton status={status} onClick={onMicClick} disabled={status === 'processing'} analyser={analyser} />
               <div className="input-row" ref={attachMenuRef}>
                 <AnimatePresence>
                   {attachMenuOpen && (
@@ -551,6 +647,14 @@ export default function AssistantPage() {
                   type="file"
                   hidden
                   accept="image/*"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePhotoUpload(f); e.currentTarget.value = ''; }}
+                />
+                <input
+                  ref={cameraFallbackRef}
+                  type="file"
+                  hidden
+                  accept="image/*"
+                  capture="environment"
                   onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePhotoUpload(f); e.currentTarget.value = ''; }}
                 />
                 <input
@@ -640,14 +744,14 @@ export default function AssistantPage() {
                   <div className="setting-row">
                     <div>
                       <div className="setting-label">Live Weather (OpenWeatherMap)</div>
-                      <div className="setting-desc">Fetch current weather for {locationHint || 'Hyderabad'}</div>
+                      <div className="setting-desc">Fetch current weather for {locationHint || 'Hyderabad'} • {healthStatus?.weatherConfigured ? 'Configured' : 'Needs WEATHER_API_KEY'}</div>
                     </div>
                     <button className="btn btn-secondary btn-sm" onClick={() => { setPluginsOpen(false); doWeather(true); }}><CloudSun size={15} /> Run</button>
                   </div>
                   <div className="setting-row">
                     <div>
                       <div className="setting-label">Live News (NewsAPI)</div>
-                      <div className="setting-desc">Get latest headlines for {locationHint || 'technology'}</div>
+                      <div className="setting-desc">Get latest headlines for {locationHint || 'technology'} • {healthStatus?.newsConfigured ? 'Configured' : 'Needs NEWS_API_KEY'}</div>
                     </div>
                     <button className="btn btn-secondary btn-sm" onClick={() => { setPluginsOpen(false); doNews(undefined, true); }}><Newspaper size={15} /> Run</button>
                   </div>

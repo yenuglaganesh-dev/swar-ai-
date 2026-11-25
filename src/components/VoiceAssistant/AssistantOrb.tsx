@@ -79,10 +79,16 @@ export default function AssistantOrb({ status, analyser }: Props) {
     };
 
     const data = analyser ? new Uint8Array(analyser.frequencyBinCount) : null;
+    const synthData = new Uint8Array(48);
     const loop = (t: number) => {
-      if (analyser && data && (status === 'listening' || status === 'speaking')) {
+      if (analyser && data && status === 'listening') {
         analyser.getByteFrequencyData(data);
-        drawBars(data, status === 'listening' ? 'rgba(255,107,53,0.9)' : 'rgba(255,154,90,0.9)');
+        drawBars(data, 'rgba(255,107,53,0.92)');
+      } else if (status === 'speaking') {
+        for (let i = 0; i < synthData.length; i++) {
+          synthData[i] = Math.floor(80 + 130 * Math.abs(Math.sin(t / 190 + i * 0.45)));
+        }
+        drawBars(synthData, 'rgba(255,154,90,0.92)');
       } else if (status === 'processing') {
         drawProcessing(t);
       } else {

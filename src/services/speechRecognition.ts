@@ -3,7 +3,7 @@ import { LanguageCode } from '@/types';
 export interface RecognitionHandlers {
   onStart?: () => void;
   onEnd?: () => void;
-  onResult?: (transcript: string, isFinal: boolean) => void;
+  onResult?: (transcript: string, isFinal: boolean, meta?: { finalText: string; interimText: string }) => void;
   onError?: (error: string) => void;
 }
 
@@ -27,15 +27,20 @@ export function createRecognition(lang: LanguageCode, handlers: RecognitionHandl
     handlers.onError?.(err);
   };
   recognition.onresult = (event: Event) => {
-    const ev = event as unknown as { resultIndex: number; results: SpeechRecognitionResultList };
-    let transcript = '';
-    let isFinal = false;
-    for (let i = ev.resultIndex; i < ev.results.length; i++) {
+    const ev = event as unknown as { results: SpeechRecognitionResultList };
+    let finalText = '';
+    let interimText = '';
+    for (let i = 0; i < ev.results.length; i++) {
       const result = ev.results[i];
-      transcript += result[0]?.transcript || '';
-      if (result.isFinal) isFinal = true;
+      const text = result[0]?.transcript || '';
+      if (result.isFinal) finalText += text;
+      else interimText += text;
     }
-    handlers.onResult?.(transcript.trim(), isFinal);
+    const cleanFinal = finalText.replace(/\s+/g, ' ').trim();
+    const cleanInterim = interimText.replace(/\s+/g, ' ').trim();
+    const combined = [cleanFinal, cleanInterim].filter(Boolean).join(' ').trim();
+    const allFinal = ev.results.length > 0 && cleanInterim.length === 0 && cleanFinal.length > 0;
+    handlers.onResult?.(combined, allFinal, { finalText: cleanFinal, interimText: cleanInterim });
   };
 
   return {
