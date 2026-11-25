@@ -562,6 +562,10 @@ app.post('/api/chat', async (req, res) => {
         if (response.status === 404 && model !== 'gemini-3.8-flash') {
           response = await callGemini('gemini-3.8-flash');
         }
+        for (let attempt = 0; attempt < 2 && response.status === 503; attempt++) {
+          await new Promise((r) => setTimeout(r, 800));
+          response = await callGemini(model);
+        }
       } else {
         response = await fetch(apiUrl, {
           method: 'POST',
