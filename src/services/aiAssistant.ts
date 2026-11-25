@@ -148,7 +148,16 @@ export async function activateApiKey(apiKey: string): Promise<ApiKeyStatus> {
       credentials: 'include',
       body: JSON.stringify({ apiKey: apiKey.trim() }),
     });
-    const data = await res.json().catch(() => ({}));
+    const data = await res.json().catch(() => null);
+    if (!data) {
+      return {
+        ok: false,
+        configured: false,
+        connectionState: 'Connection Failed',
+        error: `HTTP_${res.status}`,
+        message: `Backend endpoint error (HTTP ${res.status}). Check API routing/deployment.`,
+      };
+    }
     return {
       ok: res.ok && Boolean(data?.ok),
       configured: Boolean(data?.configured),
@@ -158,10 +167,10 @@ export async function activateApiKey(apiKey: string): Promise<ApiKeyStatus> {
       connectionState: data?.connectionState || (res.ok ? 'Connected' : 'Connection Failed'),
       updatedAt: data?.updatedAt,
       error: data?.error,
-      message: data?.message || (res.ok ? 'API Key Activated Successfully' : 'Failed to activate API key.'),
+      message: data?.message || (res.ok ? 'API Key Activated Successfully' : `Verification failed (HTTP ${res.status}).`),
     };
   } catch {
-    return { ok: false, configured: false, connectionState: 'Connection Failed', message: 'Network error while verifying API key.' };
+    return { ok: false, configured: false, connectionState: 'Connection Failed', message: 'Network error while reaching backend /api/key/activate.' };
   }
 }
 

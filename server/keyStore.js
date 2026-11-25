@@ -120,27 +120,36 @@ function parseCookies(cookieHeader) {
   return out;
 }
 
+function setHttpOnlyCookie(res, name, value, maxAgeSec = 2592000) {
+  if (!res) return;
+  const isProd = process.env.NODE_ENV === 'production' || Boolean(process.env.VERCEL);
+  const parts = [
+    `${name}=${encodeURIComponent(value)}`,
+    'Path=/',
+    'HttpOnly',
+    'SameSite=Lax',
+    `Max-Age=${maxAgeSec}`,
+    ...(isProd ? ['Secure'] : []),
+  ];
+  const prev = res.getHeader('Set-Cookie');
+  const nextCookie = parts.join('; ');
+  if (Array.isArray(prev)) res.setHeader('Set-Cookie', [...prev, nextCookie]);
+  else if (typeof prev === 'string') res.setHeader('Set-Cookie', [prev, nextCookie]);
+  else res.setHeader('Set-Cookie', nextCookie);
+}
+
 export async function resolveKeyOwner(req, res, { createGuest = false } = {}) {
   const auth = await verifySupabaseAuth(req);
-  if (auth) return { ...auth, isGuest: false };
-
   const cookies = parseCookies(req.headers.cookie);
+  if (auth) return { ...auth, isGuest: false, cookies, res };
+
   let sid = cookies.swar_sid;
   if (!sid && createGuest && res) {
     sid = crypto.randomUUID();
-    const isProd = process.env.NODE_ENV === 'production' || Boolean(process.env.VERCEL);
-    const cookieParts = [
-      `swar_sid=${encodeURIComponent(sid)}`,
-      'Path=/',
-      'HttpOnly',
-      'SameSite=Lax',
-      'Max-Age=2592000',
-      ...(isProd ? ['Secure'] : []),
-    ];
-    res.setHeader('Set-Cookie', cookieParts.join('; '));
+    setHttpOnlyCookie(res, 'swar_sid', sid);
   }
-  if (!sid) return null;
-  return { userId: `guest:${sid}`, token: null, isGuest: true };
+  if (!sid && !cookies.swar_key_enc) return null;
+  return { userId: sid ? `guest:${sid}` : 'guest:cookie', token: null, isGuest: true, cookies, res };
 }
 
 export function resolveProviderConfig(apiKey) {
@@ -336,6 +345,16 @@ export async function getUserKeyRecord(auth) {
     memoryStore.set(auth.userId, disk[auth.userId]);
     return disk[auth.userId];
   }
+  if (auth.cookies?.swar_key_enc) {
+    try {
+      const parsed = JSON.parse(Buffer.from(auth.cookies.swar_key_enc, 'base64url').toString('utf8'));
+      if (parsed?.user_id === auth.userId && parsed?.encrypted_key) {
+        return parsed;
+      }
+    } catch {
+      /* ignore malformed cookie */
+    }
+  }
   return null;
 }
 
@@ -356,6 +375,11 @@ export async function saveUserKeyRecord(auth, plainKey, verification) {
   disk[auth.userId] = record;
   writeLocalStore(disk);
 
+  if (auth.res) {
+    const tokenPayload = Buffer.from(JSON.stringify(record), 'utf8').toString('base64url');
+    setHttpOnlyCookie(auth.res, 'swar_key_enc', tokenPayload);
+  }
+
   const sb = getSupabaseConfig();
   if (sb && auth.token) {
     try {
@@ -370,7 +394,7 @@ export async function saveUserKeyRecord(auth, plainKey, verification) {
         body: JSON.stringify(record),
       });
     } catch {
-      /* local encrypted store already persisted */
+      /* local/cookie encrypted store already persisted */
     }
   }
   return {
@@ -389,6 +413,10 @@ export async function deleteUserKeyRecord(auth) {
   const disk = readLocalStore();
   delete disk[auth.userId];
   writeLocalStore(disk);
+
+  if (auth.res) {
+    setHttpOnlyCookie(auth.res, 'swar_key_enc', '', 0);
+  }
 
   const sb = getSupabaseConfig();
   if (sb && auth.token) {
