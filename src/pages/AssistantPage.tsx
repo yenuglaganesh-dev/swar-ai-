@@ -34,6 +34,8 @@ export default function AssistantPage() {
   const [error, setError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
+  const [apiKeyDraft, setApiKeyDraft] = useState(settings.customApiKey);
+  const [apiKeySaved, setApiKeySaved] = useState(false);
   const [attachMenuOpen, setAttachMenuOpen] = useState(false);
   const [pluginsOpen, setPluginsOpen] = useState(false);
   const [thinkHarder, setThinkHarder] = useState(false);
@@ -76,6 +78,7 @@ export default function AssistantPage() {
   const ttsSupported = isSpeechSynthesisSupported();
 
   useEffect(() => { setContinuous(settings.continuousMode); }, [settings.continuousMode]);
+  useEffect(() => { setApiKeyDraft(settings.customApiKey); }, [settings.customApiKey]);
   useEffect(() => { if (settings.saveHistory) try { localStorage.setItem(HISTORY_KEY, JSON.stringify(messages.slice(-50))); } catch {} }, [messages, settings.saveHistory]);
   useEffect(() => { if (!settings.saveHistory) safeStorage.removeItem(HISTORY_KEY); }, [settings.saveHistory]);
   useEffect(() => { document.documentElement.dataset.theme = 'dark'; }, []);
@@ -705,23 +708,54 @@ export default function AssistantPage() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
                       <div>
                         <div className="setting-label" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><KeyRound size={15} /> Custom AI API Key</div>
-                        <div className="setting-desc">{settings.customApiKey ? 'Using your custom API key (saved in browser)' : 'Using server default key. Paste a Gemini (AIza...) or OpenCode key if credits run out.'}</div>
+                        <div className="setting-desc">
+                          {apiKeySaved
+                            ? 'API Key saved and active!'
+                            : settings.customApiKey
+                              ? 'Using your custom API key (saved in browser)'
+                              : 'Using server default key. Paste a Gemini (AIza...) or OpenCode key and click Set Key.'}
+                        </div>
                       </div>
-                      {settings.customApiKey && (
-                        <button className="btn btn-ghost btn-sm" onClick={() => updateSettings({ customApiKey: '' })}>Clear</button>
+                      {(settings.customApiKey || apiKeyDraft) && (
+                        <button
+                          className="btn btn-ghost btn-sm"
+                          type="button"
+                          onClick={() => {
+                            setApiKeyDraft('');
+                            updateSettings({ customApiKey: '' });
+                            setApiKeySaved(false);
+                          }}
+                        >
+                          Clear
+                        </button>
                       )}
                     </div>
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                       <input
                         className="input"
+                        style={{ flex: 1, minWidth: 180 }}
                         type={showApiKey ? 'text' : 'password'}
-                        value={settings.customApiKey}
-                        onChange={(e) => updateSettings({ customApiKey: e.target.value })}
+                        value={apiKeyDraft}
+                        onChange={(e) => { setApiKeyDraft(e.target.value); setApiKeySaved(false); }}
                         placeholder="Paste Gemini (AIza...) or OpenCode API key"
                         autoComplete="off"
                       />
                       <button className="btn btn-secondary btn-icon" type="button" onClick={() => setShowApiKey((v) => !v)} aria-label={showApiKey ? 'Hide API key' : 'Show API key'}>
                         {showApiKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                      <button
+                        className="btn btn-primary btn-sm"
+                        type="button"
+                        disabled={!apiKeyDraft.trim()}
+                        onClick={() => {
+                          const trimmed = apiKeyDraft.trim();
+                          updateSettings({ customApiKey: trimmed });
+                          setApiKeySaved(true);
+                          setError(null);
+                          setTimeout(() => setApiKeySaved(false), 3000);
+                        }}
+                      >
+                        <Check size={15} /> Set Key
                       </button>
                     </div>
                   </div>
