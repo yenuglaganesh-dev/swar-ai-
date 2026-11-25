@@ -736,7 +736,12 @@ export default function AssistantPage() {
                         style={{ flex: 1, minWidth: 180 }}
                         type={showApiKey ? 'text' : 'password'}
                         value={apiKeyDraft}
-                        onChange={(e) => { setApiKeyDraft(e.target.value); setApiKeySaved(false); }}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setApiKeyDraft(val);
+                          updateSettings({ customApiKey: val.trim() });
+                          setApiKeySaved(false);
+                        }}
                         placeholder="Paste Gemini (AIza...) or OpenCode API key"
                         autoComplete="off"
                       />

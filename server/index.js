@@ -392,7 +392,7 @@ app.post('/api/chat', async (req, res) => {
         : response.status === 429 ? 'AI_RATE_LIMITED'
           : response.status === 404 ? 'AI_MODEL_OR_ENDPOINT_ERROR'
             : response.status === 400 ? 'AI_BAD_REQUEST' : 'AI_UPSTREAM_ERROR';
-      console.error('AI API error', { status: response.status, code: safeCode, message: safeProviderMessage });
+      console.error('AI API error', { provider: isGeminiKey ? 'gemini' : 'opencode', status: response.status, code: safeCode, message: safeProviderMessage });
       return res.status(502).json({
         ...fallbackResponse('', responseLanguage, reason),
         providerStatus: response.status,
