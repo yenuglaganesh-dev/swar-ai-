@@ -556,8 +556,8 @@ app.post('/api/chat', async (req, res) => {
         );
 
         response = await callGemini(model);
-        if (response.status === 404 && model !== 'gemini-2.0-flash') {
-          response = await callGemini('gemini-2.0-flash');
+        if (response.status === 404 && model !== 'gemini-3.8-flash') {
+          response = await callGemini('gemini-3.8-flash');
         }
       } else {
         response = await fetch(apiUrl, {

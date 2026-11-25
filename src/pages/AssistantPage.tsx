@@ -675,7 +675,7 @@ export default function AssistantPage() {
                         <div className="setting-desc">
                           {keyStatus.configured
                             ? `Active key: ${keyStatus.keySuffix || '••••'} (${keyStatus.provider || 'AI'} • ${keyStatus.model || 'default'})`
-                            : 'Paste a Gemini (AIza...) or OpenCode key and click Set Key to verify & activate.'}
+                            : 'Paste a Gemini (AIza... / AQ....) or OpenCode key and click Set Key to verify & activate.'}
                         </div>
                       </div>
                       {keyStatus.configured && (
@@ -691,7 +691,7 @@ export default function AssistantPage() {
                         type={showApiKey ? 'text' : 'password'}
                         value={apiKeyDraft}
                         onChange={(e) => { setApiKeyDraft(e.target.value); setKeyFeedback(null); }}
-                        placeholder={keyStatus.configured ? 'Paste new key to replace active key' : 'Paste Gemini (AIza...) or OpenCode API key'}
+                        placeholder={keyStatus.configured ? 'Paste new key to replace active key' : 'Paste Gemini (AIza... / AQ....) or OpenCode API key'}
                         autoComplete="off"
                         disabled={keyBusy}
                       />

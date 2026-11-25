@@ -154,10 +154,10 @@ export async function resolveKeyOwner(req, res, { createGuest = false } = {}) {
 
 export function resolveProviderConfig(apiKey) {
   const trimmed = String(apiKey || '').trim();
-  const isGeminiKey = trimmed.startsWith('AIza');
+  const isGeminiKey = trimmed.startsWith('AIza') || trimmed.startsWith('AQ.');
   const provider = isGeminiKey ? 'gemini' : 'opencode';
   const model = isGeminiKey
-    ? (process.env.GEMINI_MODEL || 'gemini-2.5-flash')
+    ? (process.env.GEMINI_MODEL || 'gemini-3.8-flash')
     : (process.env.AI_MODEL || 'big-pickle');
   const apiUrl = isGeminiKey
     ? `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`
@@ -178,6 +178,7 @@ export async function verifyProviderKey(apiKey) {
   }
 
   const { isGeminiKey, provider, model, apiUrl } = resolveProviderConfig(trimmed);
+  let activeModel = model;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 15000);
 
@@ -196,9 +197,10 @@ export async function verifyProviderKey(apiKey) {
           signal: controller.signal,
         },
       );
-      response = await callGemini(model);
-      if (response.status === 404 && model !== 'gemini-2.0-flash') {
-        response = await callGemini('gemini-2.0-flash');
+      response = await callGemini(activeModel);
+      if (response.status === 404 && activeModel !== 'gemini-3.8-flash') {
+        activeModel = 'gemini-3.8-flash';
+        response = await callGemini(activeModel);
       }
     } else {
       response = await fetch(apiUrl, {
@@ -208,7 +210,7 @@ export async function verifyProviderKey(apiKey) {
           Authorization: `Bearer ${trimmed}`,
         },
         body: JSON.stringify({
-          model,
+          model: activeModel,
           max_tokens: 5,
           temperature: 0,
           messages: [{ role: 'user', content: 'Reply with OK' }],
@@ -223,7 +225,7 @@ export async function verifyProviderKey(apiKey) {
         httpStatus: 200,
         connectionState: 'Connected',
         provider,
-        model,
+        model: activeModel,
         message: 'API key verified and connected.',
       };
     }
