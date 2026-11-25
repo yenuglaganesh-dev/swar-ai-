@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Send, Settings, Trash2, Volume2, RotateCcw, User, Home, AlertTriangle, MicOff, Camera, FileUp, X, LayoutDashboard, ShieldAlert, CloudSun, Newspaper, Brain, GraduationCap, Languages, KeyRound, Eye, EyeOff, Plus, Image, FileText, Puzzle, Sparkles, Check } from 'lucide-react';
+import { Send, Settings, Trash2, Volume2, RotateCcw, User, Home, AlertTriangle, Camera, FileUp, X, LayoutDashboard, ShieldAlert, Brain, GraduationCap, Languages, KeyRound, Eye, EyeOff, Plus, Image, FileText, Puzzle, Sparkles, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import PageShell from '@/components/Layout/PageShell';
 import LanguageSelector from '@/components/Layout/LanguageSelector';
@@ -14,7 +14,7 @@ import { useAuth } from '@/context/AuthContext';
 import { AssistantStatus, ChatMessage, LanguageCode } from '@/types';
 import { createRecognition, isSpeechRecognitionSupported } from '@/services/speechRecognition';
 import { isSpeechSynthesisSupported, speakText, stopSpeaking } from '@/services/speechSynthesis';
-import { sendChatMessage, fetchWeather, fetchNews, type WeatherData, type NewsArticle, type ApiResult } from '@/services/aiAssistant';
+import { sendChatMessage } from '@/services/aiAssistant';
 import { safeStorage, safeJsonParse } from '@/services/safeStorage';
 import { detectLanguageFromText } from '@/services/languageDetection';
 import { addMemory, createConversation, getProfile, listMemories, logUsage, saveMessage, upsertProfile } from '@/services/dataStore';
@@ -48,10 +48,6 @@ export default function AssistantPage() {
   const [cameraOpen, setCameraOpen] = useState(false);
   const [memories, setMemories] = useState<string[]>([]);
   const [memoryCandidate, setMemoryCandidate] = useState<string | null>(null);
-  const [weatherResult, setWeatherResult] = useState<ApiResult<WeatherData> | null>(null);
-  const [newsResult, setNewsResult] = useState<ApiResult<{ source: string; query: string; articles: NewsArticle[] }> | null>(null);
-  const [weatherLoading, setWeatherLoading] = useState(false);
-  const [newsLoading, setNewsLoading] = useState(false);
   const [locationHint, setLocationHint] = useState(safeStorage.getItem('swar_location') || 'Hyderabad');
 
   const recognitionRef = useRef<ReturnType<typeof createRecognition> | null>(null);
@@ -446,29 +442,6 @@ export default function AssistantPage() {
     ctx.drawImage(video, 0, 0); setImageDataUrl(canvas.toDataURL('image/jpeg', 0.8)); stopCamera();
   };
 
-  const doWeather = async (askAssistant = true) => {
-    setWeatherLoading(true); setError(null);
-    const r = await fetchWeather(locationHint || 'Hyderabad');
-    setWeatherResult(r); setWeatherLoading(false);
-    if (askAssistant) {
-      if (r.ok && r.data) handleSend(`${t('weather')} in ${locationHint || 'Hyderabad'}`);
-      else setError(r.message || t('weatherError'));
-    }
-    return r;
-  };
-
-  const doNews = async (query?: string, askAssistant = true) => {
-    const q = (query || locationHint || 'technology').trim();
-    setNewsLoading(true); setError(null);
-    const r = await fetchNews(q);
-    setNewsResult(r); setNewsLoading(false);
-    if (askAssistant) {
-      if (r.ok && r.data?.articles?.length) handleSend(`${t('news')} about ${q}`);
-      else setError(r.message || t('newsError'));
-    }
-    return r;
-  };
-
   const saveMemoryCandidate = async () => {
     if (!memoryCandidate || !user) { setMemoryCandidate(null); return; }
     await addMemory(user.uid, memoryCandidate);
@@ -505,44 +478,6 @@ export default function AssistantPage() {
               <button className={`chip ${mode === 'translate' ? 'active-chip' : ''}`} onClick={() => setMode(mode === 'translate' ? 'default' : 'translate')}><Languages size={14} />{t('translateMode')}</button>
               <button className={`chip ${mode === 'emergency' ? 'active-chip' : ''}`} onClick={() => setMode(mode === 'emergency' ? 'default' : 'emergency')}><ShieldAlert size={14} />{t('emergency')}</button>
             </div>
-            {(weatherLoading || weatherResult || newsLoading || newsResult) && (
-              <div className="live-data-grid" aria-live="polite">
-                <div className="live-card">
-                  <div className="live-card-head"><CloudSun size={16} /> <strong>{t('weather')}</strong></div>
-                  {weatherLoading && <p className="muted">{t('weatherLoading')}</p>}
-                  {!weatherLoading && weatherResult?.ok && weatherResult.data && (
-                    <div className="live-body">
-                      <div><strong>{weatherResult.data.location}{weatherResult.data.country ? `, ${weatherResult.data.country}` : ''}</strong></div>
-                      <div>{t('temperature')}: {weatherResult.data.tempC != null ? `${Math.round(weatherResult.data.tempC)}°C` : '—'} {weatherResult.data.feelsLikeC != null ? `(${t('feelsLike')} ${Math.round(weatherResult.data.feelsLikeC)}°C)` : ''}</div>
-                      <div>{t('conditions')}: {weatherResult.data.conditions || '—'}</div>
-                      <div>{t('humidity')}: {weatherResult.data.humidity != null ? `${weatherResult.data.humidity}%` : '—'} | {t('windSpeed')}: {weatherResult.data.windSpeedMps != null ? `${weatherResult.data.windSpeedMps} m/s` : '—'}</div>
-                      <div className="muted small">{t('source')}: {weatherResult.data.source}. {t('weatherApiPlanNote')}</div>
-                    </div>
-                  )}
-                  {!weatherLoading && weatherResult && !weatherResult.ok && (
-                    <div className="live-body"><div className="live-error">{weatherResult.message || t('weatherError')}</div><button className="btn btn-secondary btn-sm" onClick={() => doWeather(false)}>{t('retry')}</button></div>
-                  )}
-                </div>
-                <div className="live-card">
-                  <div className="live-card-head"><Newspaper size={16} /> <strong>{t('news')}</strong></div>
-                  {newsLoading && <p className="muted">{t('newsLoading')}</p>}
-                  {!newsLoading && newsResult?.ok && newsResult.data && (
-                    <div className="live-body">
-                      {newsResult.data.articles.length ? newsResult.data.articles.map((a, i) => (
-                        <article key={a.url + i} className="news-item">
-                          <a href={a.url} target="_blank" rel="noreferrer" className="news-title">{a.title}</a>
-                          <div className="muted small">{a.source}{a.publishedAt ? ` • ${new Date(a.publishedAt).toLocaleString()}` : ''}</div>
-                        </article>
-                      )) : <div className="muted">{t('noNewsFound')}</div>}
-                      <div className="muted small">{t('source')}: {newsResult.data.source}. {t('newsApiPlanNote')}</div>
-                    </div>
-                  )}
-                  {!newsLoading && newsResult && !newsResult.ok && (
-                    <div className="live-body"><div className="live-error">{newsResult.message || t('newsError')}</div><button className="btn btn-secondary btn-sm" onClick={() => doNews(undefined, false)}>{t('retry')}</button></div>
-                  )}
-                </div>
-              </div>
-            )}
             {!ttsSupported && <div className="notice"><AlertTriangle size={16} />{t('ttsNotSupported')}</div>}
             {docName && <div className="notice"><FileUp size={16} />{t('documentLoaded')}: {docName} <button className="link-btn" onClick={() => { setDocText(''); setDocName(''); }}>{t('close')}</button></div>}
             {imageDataUrl && <div className="notice"><Camera size={16} />{t('imageAttached')} <button className="link-btn" onClick={() => setImageDataUrl('')}>{t('removeImage')}</button></div>}
@@ -567,9 +502,6 @@ export default function AssistantPage() {
             )}
             <div className="chat-controls">
               <div className="tool-row">
-                <button className="btn btn-secondary btn-sm" onClick={() => doWeather(true)} disabled={weatherLoading}><CloudSun size={16} />{weatherLoading ? t('loading') : t('weather')}</button>
-                <button className="btn btn-secondary btn-sm" onClick={() => doNews(undefined, true)} disabled={newsLoading}><Newspaper size={16} />{newsLoading ? t('loading') : t('news')}</button>
-                <button className="btn btn-secondary btn-sm" onClick={() => { stopSpeaking(); recognitionRef.current?.abort(); cleanupAudio(); pendingListenRef.current = false; setStatus('idle'); }}><MicOff size={16} />{t('stopSpeaking')}</button>
                 <button
                   className={`btn btn-secondary btn-sm ${continuous ? 'active-toggle' : ''}`}
                   onClick={() => { const v = !continuous; setContinuous(v); updateSettings({ continuousMode: v }); }}
@@ -782,17 +714,10 @@ export default function AssistantPage() {
                 <div className="settings-body">
                   <div className="setting-row">
                     <div>
-                      <div className="setting-label">Live Weather (OpenWeatherMap)</div>
-                      <div className="setting-desc">Fetch current weather for {locationHint || 'Hyderabad'} • {healthStatus?.weatherConfigured ? 'Configured' : 'Needs WEATHER_API_KEY'}</div>
+                      <div className="setting-label">Voice Conversation Mode</div>
+                      <div className="setting-desc">Hands-free continuous voice chat with spoken replies</div>
                     </div>
-                    <button className="btn btn-secondary btn-sm" onClick={() => { setPluginsOpen(false); doWeather(true); }}><CloudSun size={15} /> Run</button>
-                  </div>
-                  <div className="setting-row">
-                    <div>
-                      <div className="setting-label">Live News (NewsAPI)</div>
-                      <div className="setting-desc">Get latest headlines for {locationHint || 'technology'} • {healthStatus?.newsConfigured ? 'Configured' : 'Needs NEWS_API_KEY'}</div>
-                    </div>
-                    <button className="btn btn-secondary btn-sm" onClick={() => { setPluginsOpen(false); doNews(undefined, true); }}><Newspaper size={15} /> Run</button>
+                    <button className={`toggle ${continuous ? 'on' : ''}`} onClick={() => { const v = !continuous; setContinuous(v); updateSettings({ continuousMode: v }); }} aria-pressed={continuous}><span /></button>
                   </div>
                   <div className="setting-row">
                     <div>
@@ -804,7 +729,7 @@ export default function AssistantPage() {
                   <div className="setting-row">
                     <div>
                       <div className="setting-label">Custom AI / Gemini API Key</div>
-                      <div className="setting-desc">{settings.customApiKey ? 'Custom key active' : 'Using server default key'}</div>
+                      <div className="setting-desc">{settings.customApiKey ? 'Custom key active' : healthStatus?.aiConfigured ? 'Using server default key' : 'Needs API key configuration'}</div>
                     </div>
                     <button className="btn btn-secondary btn-sm" onClick={() => { setPluginsOpen(false); setShowSettings(true); }}><KeyRound size={15} /> Configure</button>
                   </div>
@@ -838,13 +763,6 @@ export default function AssistantPage() {
         .assistant-intro{color:var(--text-muted);text-align:center;max-width:320px;line-height:1.6;margin:0}
         .quick-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}.active-chip,.active-toggle{background:rgba(255,107,53,0.18)!important;border-color:rgba(255,107,53,0.5)!important;color:#fff!important}
         .notice{display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:10px;background:rgba(255,154,90,0.1);color:#ffd2c2;font-size:.88rem;flex-wrap:wrap}
-        .live-data-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;width:100%;max-width:920px}
-        .live-card{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:14px;text-align:left}
-        .live-card-head{display:flex;gap:8px;align-items:center;margin-bottom:8px;color:#fff}
-        .live-body{display:flex;flex-direction:column;gap:8px;font-size:.92rem;color:#ddd}
-        .news-item{padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.06)} .news-item:last-child{border-bottom:none}
-        .news-title{color:#ffd2c2;text-decoration:none;line-height:1.4} .news-title:hover{text-decoration:underline}
-        .muted{color:var(--text-muted)} .small{font-size:.78rem} .live-error{color:#ffb3b3}
         .assistant-chat{border-radius:24px;padding:20px;display:flex;flex-direction:column;min-height:0;height:calc(100vh - 120px)}
         .chat-error{display:flex;align-items:center;gap:8px;padding:12px 14px;border-radius:12px;background:rgba(255,77,77,0.1);color:#ffb3b3;font-size:.9rem;margin-bottom:12px;flex-wrap:wrap}
         .chat-controls{display:flex;flex-direction:column;gap:16px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.06)}

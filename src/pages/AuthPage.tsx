@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Mail, Lock, Eye, EyeOff, ArrowRight, AlertCircle, CheckCircle2, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
@@ -7,13 +7,13 @@ import SwarAICircle from '@/components/Mascot/SwarAICircle';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { isSupabaseConfigured } from '@/services/supabase';
-import { supabaseSignInWithEmail, supabaseSignUpWithEmail, supabaseSignInWithGoogle, supabaseResetPassword } from '@/services/supabaseAuth';
+import { supabaseSignInWithEmail, supabaseSignUpWithEmail, supabaseSignInWithGoogle, supabaseResetPassword, supabaseUpdatePassword } from '@/services/supabaseAuth';
 
-type Mode = 'signin' | 'signup' | 'reset';
+type Mode = 'signin' | 'signup' | 'reset' | 'updatePassword';
 
 export default function AuthPage() {
   const { t } = useLanguage();
-  const { configured } = useAuth();
+  const { user, loading: authLoading, configured, passwordRecovery, clearPasswordRecovery } = useAuth();
   const navigate = useNavigate();
   const reduce = useReducedMotion();
   const [mode, setMode] = useState<Mode>('signin');
@@ -26,6 +26,27 @@ export default function AuthPage() {
   const [focusField, setFocusField] = useState<'email' | 'password' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const searchParams = new URLSearchParams(window.location.search);
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    const errDesc = searchParams.get('error_description') || hashParams.get('error_description') || searchParams.get('error') || hashParams.get('error');
+    if (errDesc) {
+      setError(errDesc);
+      setMood('error');
+    }
+  }, []);
+
+  useEffect(() => {
+    if (passwordRecovery) {
+      setMode('updatePassword');
+      return;
+    }
+    if (!authLoading && user) {
+      navigate('/assistant', { replace: true });
+    }
+  }, [authLoading, user, passwordRecovery, navigate]);
 
   const notConfigured = !configured || !isSupabaseConfigured();
   const activeMood = loading ? 'thinking' : error ? 'error' : mood === 'success' ? 'success' : focusField === 'password' ? 'password' : focusField === 'email' ? 'email' : 'idle';
@@ -71,7 +92,16 @@ export default function AuthPage() {
     setInfo(t('passwordResetSent')); setMood('success');
   }, t('emailError'));
 
-  const title = mode === 'signup' ? t('createAccount') : mode === 'reset' ? t('forgotPassword') : t('welcomeBack');
+  const handleUpdatePassword = () => wrap(async () => {
+    const { error } = await supabaseUpdatePassword(password);
+    if (error) throw error;
+    clearPasswordRecovery();
+    setMood('success');
+    setInfo('Password updated! Redirecting...');
+    window.setTimeout(() => navigate('/assistant', { replace: true }), 700);
+  }, t('emailError'));
+
+  const title = mode === 'signup' ? t('createAccount') : mode === 'reset' ? t('forgotPassword') : mode === 'updatePassword' ? 'Set new password' : t('welcomeBack');
 
   return (
     <PageShell>
@@ -136,6 +166,12 @@ export default function AuthPage() {
                       <label className="field"><span className="field-label">{t('email')}</span><div className="input-wrap"><Mail size={18} className="input-icon" /><input className="input" type="email" value={email} onChange={(e) => { setEmail(e.target.value); resetFeedback(); }} required placeholder="you@example.com" /></div></label>
                       <button className="btn btn-primary submit-btn" type="submit" disabled={loading || notConfigured || !email}>{loading ? <span className="btn-loading"><span className="spinner" />{t('loading')}</span> : t('forgotPassword')}</button>
                       <button type="button" className="link-btn" onClick={() => { setMode('signin'); resetFeedback(); }}>{t('back')}</button>
+                    </form>
+                  )}
+                  {mode === 'updatePassword' && (
+                    <form className="auth-form" onSubmit={(e) => { e.preventDefault(); handleUpdatePassword(); }}>
+                      <label className="field"><span className="field-label">New {t('password')}</span><div className="input-wrap"><Lock size={18} className="input-icon" /><input className="input" type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => { setPassword(e.target.value); resetFeedback(); }} autoComplete="new-password" required minLength={6} placeholder="••••••••" /><button type="button" className="eye-btn" onClick={() => setShowPassword((v) => !v)} aria-label={showPassword ? t('hidePassword') : t('showPassword')}>{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button></div></label>
+                      <button className="btn btn-primary submit-btn" type="submit" disabled={loading || notConfigured || password.length < 6}>{loading ? <span className="btn-loading"><span className="spinner" />{t('loading')}</span> : 'Update password'}</button>
                     </form>
                   )}
                 </motion.div>

@@ -13,8 +13,17 @@ export async function supabaseSignUpWithEmail(email: string, password: string, n
   return sb.auth.signUp({
     email,
     password,
-    options: { data: name ? { name } : undefined },
+    options: {
+      data: name ? { name } : undefined,
+      emailRedirectTo: typeof window !== 'undefined' ? `${window.location.origin}/auth` : undefined,
+    },
   });
+}
+
+export async function supabaseUpdatePassword(newPassword: string) {
+  const sb = getSupabase();
+  if (!sb) throw new Error('SUPABASE_NOT_CONFIGURED');
+  return sb.auth.updateUser({ password: newPassword });
 }
 
 export async function supabaseSignInWithGoogle() {

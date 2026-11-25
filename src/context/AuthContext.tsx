@@ -7,6 +7,8 @@ interface AuthContextValue {
   user: UserProfile | null;
   loading: boolean;
   configured: boolean;
+  passwordRecovery: boolean;
+  clearPasswordRecovery: () => void;
   signOut: () => Promise<void>;
 }
 
@@ -15,6 +17,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [passwordRecovery, setPasswordRecovery] = useState(false);
   const configured = isSupabaseConfigured();
 
   useEffect(() => {
@@ -32,8 +35,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     });
 
-    const { data: sub } = sb.auth.onAuthStateChange((_event, session) => {
+    const { data: sub } = sb.auth.onAuthStateChange((event, session) => {
       if (!mounted) return;
+      if (event === 'PASSWORD_RECOVERY') setPasswordRecovery(true);
+      if (event === 'SIGNED_OUT') setPasswordRecovery(false);
       setUser(session?.user ? mapSupabaseUser(session.user) : null);
       setLoading(false);
     });
@@ -46,10 +51,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     await supabaseSignOut().catch((e) => console.warn('Sign out error:', e?.message || e));
+    setPasswordRecovery(false);
     setUser(null);
   };
 
-  const value = useMemo(() => ({ user, loading, configured, signOut }), [user, loading, configured]);
+  const clearPasswordRecovery = () => setPasswordRecovery(false);
+
+  const value = useMemo(
+    () => ({ user, loading, configured, passwordRecovery, clearPasswordRecovery, signOut }),
+    [user, loading, configured, passwordRecovery],
+  );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

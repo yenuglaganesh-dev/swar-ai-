@@ -11,7 +11,22 @@ const PORT = Number(process.env.PORT || 3001);
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
 const DEFAULT_WEATHER_LOCATION = process.env.DEFAULT_WEATHER_LOCATION || 'Hyderabad';
 
-app.use(cors({ origin: CLIENT_ORIGIN, credentials: true }));
+const allowedOrigins = new Set(
+  [
+    CLIENT_ORIGIN,
+    'http://localhost:5173',
+    process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '',
+    process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : '',
+  ].filter(Boolean),
+);
+
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.has(origin)) return callback(null, true);
+    return callback(null, false);
+  },
+  credentials: true,
+}));
 app.use(express.json({ limit: '1mb' }));
 
 // Vercel catch-all functions can expose the path with or without the /api
@@ -251,6 +266,21 @@ app.post('/api/news', async (req, res) => {
   res.json(result);
 });
 
+export function detectLanguageFromText(text) {
+  if (typeof text !== 'string') return 'en-IN';
+  if (/[\u0C00-\u0C7F]/u.test(text)) return 'te-IN';
+  if (/[\u0900-\u097F]/u.test(text)) return 'hi-IN';
+  return 'en-IN';
+}
+
+export function detectIntentKeywords(text) {
+  const lower = String(text || '').toLowerCase();
+  return {
+    wantsWeather: /\b(weather|temperature|forecast|rain|humidity|wind|hot|cold|sunny|cloudy)\b|मौसम|तापमान|बारिश|వాతావరణం|ఉష్ణోగ్రత|వర్షం/u.test(lower),
+    wantsNews: /\b(news|headlines|latest|happening|breaking|article)\b|समाचार|खबर|వార్తలు|తాజా/u.test(lower),
+  };
+}
+
 app.post('/api/chat', async (req, res) => {
   const body = req.body || {};
   const messages = body.messages ?? [];
@@ -277,8 +307,7 @@ app.post('/api/chat', async (req, res) => {
   }
 
   // Unicode-script detection is reliable for Telugu and Hindi; English is the fallback.
-  const detectedFromText = /[\\u0C00-\\u0C7F]/u.test(lastUser) ? 'te-IN'
-    : /[\\u0900-\\u097F]/u.test(lastUser) ? 'hi-IN' : 'en-IN';
+  const detectedFromText = detectLanguageFromText(lastUser);
   const responseLanguage = autoDetect ? detectedFromText : language;
   const customApiKey = typeof body.customApiKey === 'string' ? body.customApiKey.trim() : '';
   const apiKey = customApiKey || process.env.AI_API_KEY;
@@ -292,18 +321,16 @@ app.post('/api/chat', async (req, res) => {
   const visionModel = isGeminiKey ? model : (process.env.AI_VISION_MODEL || model);
 
   let liveContext = '';
-  const lower = lastUser.toLowerCase();
-  const wantsWeather = /\\b(weather|temperature|forecast|rain|humidity|wind|hot|cold|sunny|cloudy)\\b|मौसम|तापमान|बारिश|వాతావరణం|ఉష్ణోగ్రత|వర్షం/u.test(lower);
-  const wantsNews = /\\b(news|headlines|latest|happening|breaking|article)\\b|समाचार|खबर|వార్తలు|తాజా/u.test(lower);
+  const { wantsWeather, wantsNews } = detectIntentKeywords(lastUser);
   if (wantsWeather) {
     const weatherLoc = locationHint.trim() || DEFAULT_WEATHER_LOCATION;
     const w = await fetchWeather(weatherLoc);
-    liveContext += `\\nLive weather result: ${JSON.stringify({ ok: w.ok, configured: w.configured, error: w.error, message: w.message, data: w.data, retryAfterSec: w.retryAfterSec })}`;
+    liveContext += `\nLive weather result: ${JSON.stringify({ ok: w.ok, configured: w.configured, error: w.error, message: w.message, data: w.data, retryAfterSec: w.retryAfterSec })}`;
   }
   if (wantsNews) {
     const topic = locationHint.trim() || 'technology OR India';
     const n = await fetchNews(topic);
-    liveContext += `\\nLive news result: ${JSON.stringify({ ok: n.ok, configured: n.configured, error: n.error, message: n.message, data: n.data, retryAfterSec: n.retryAfterSec })}`;
+    liveContext += `\nLive news result: ${JSON.stringify({ ok: n.ok, configured: n.configured, error: n.error, message: n.message, data: n.data, retryAfterSec: n.retryAfterSec })}`;
   }
 
   if (!apiKey) {
@@ -319,7 +346,7 @@ app.post('/api/chat', async (req, res) => {
       imageAttached: hasImage,
       location: locationHint.slice(0, 120),
       thinkHarder,
-    }) + (liveContext ? `\\n${liveContext}` : '');
+    }) + (liveContext ? `\n${liveContext}` : '');
 
     const chatMessages = [{ role: 'system', content: system }, ...safeMessages.slice(0, -1)];
     if (hasImage) {
