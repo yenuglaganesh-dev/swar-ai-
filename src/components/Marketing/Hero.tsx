@@ -32,14 +32,14 @@ export default function Hero() {
             <span className="gradient-text">{t('heroTitle')}</span>
           </motion.h1>
           <motion.p className="hero-sub" initial={reduce ? false : { opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 0.2 }}>
-            {t('heroSubtitle')}
+            {t('heroDesc')}
           </motion.p>
           <motion.div className="hero-actions" initial={reduce ? false : { opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 0.28 }}>
-            <Link to="/assistant" className="btn btn-primary btn-lg hero-cta"><Mic size={20} />{t('heroCta')}</Link>
-            <a href="#features" className="btn btn-secondary btn-lg">{t('heroSecondary')}</a>
+            <Link to="/assistant" className="btn btn-primary btn-lg hero-cta"><Mic size={20} />{t('startTalking')}</Link>
+            <a href="#features" className="btn btn-secondary btn-lg">{t('seeFeatures')}</a>
           </motion.div>
           <motion.div className="hero-langs" initial={reduce ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.45 }}>
-            <span>తెలుగు</span><span className="dot" /><span>हिन्दी</span><span className="dot" /><span>English</span>
+            <span>English</span><span className="dot" /><span>తెలుగు</span><span className="dot" /><span>हिन्दी</span>
           </motion.div>
         </div>
 

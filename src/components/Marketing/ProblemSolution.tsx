@@ -1,25 +1,27 @@
 import { XCircle, CheckCircle2 } from 'lucide-react';
 import Reveal from './Reveal';
+import { useLanguage } from '@/context/LanguageContext';
 
 export default function ProblemSolution() {
-  const problems = ['Typing barriers for many users', 'Language gaps in digital tools', 'Complex interfaces and small controls', 'Information that is hard to access by voice'];
-  const solutions = ['Natural voice conversations', 'Telugu, Hindi, and English support', 'Large, accessible, easy-mode controls', 'AI answers, translation, tutor, and document help'];
+  const { t } = useLanguage();
+  const problems = [t('problem1'), t('problem2'), t('problem3'), t('problem4')];
+  const solutions = [t('solution1'), t('solution2'), t('solution3'), t('solution4')];
   return (
     <section className="section ps-section" id="problem-solution">
       <div className="container">
         <Reveal className="section-head center">
-          <span className="eyebrow">Why SWAR AI</span>
-          <h2 className="section-title"><span className="gradient-text">From barriers to conversation</span></h2>
-          <p className="section-subtitle" style={{ margin: '0 auto' }}>Technology should listen. SWAR AI turns everyday questions into simple voice interactions.</p>
+          <span className="eyebrow">{t('whySwarTitle')}</span>
+          <h2 className="section-title"><span className="gradient-text">{t('whySwarSubtitle').split('.')[0]}</span></h2>
+          <p className="section-subtitle" style={{ margin: '0 auto' }}>{t('whySwarSubtitle')}</p>
         </Reveal>
         <div className="ps-grid">
           <Reveal className="ps-card glass ps-problem">
-            <h3><XCircle size={20} className="ps-bad" /> The problem</h3>
+            <h3><XCircle size={20} className="ps-bad" /> {t('problemTitle')}</h3>
             <ul>{problems.map((p) => <li key={p}><span className="ps-dot bad" />{p}</li>)}</ul>
           </Reveal>
           <Reveal delay={0.12} className="ps-card glass ps-solution">
             <div className="ps-glow" aria-hidden />
-            <h3><CheckCircle2 size={20} className="ps-good" /> The SWAR AI solution</h3>
+            <h3><CheckCircle2 size={20} className="ps-good" /> {t('solutionTitle')}</h3>
             <ul>{solutions.map((s) => <li key={s}><span className="ps-dot good" />{s}</li>)}</ul>
           </Reveal>
         </div>

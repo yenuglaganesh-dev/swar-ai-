@@ -94,7 +94,7 @@ export default function AuthPage() {
             <section className="auth-visual">
               <div className="visual-top">
                 <div className="brand-mini"><span className="brand-dot" /> {t('appName')}</div>
-                <div className="visual-pill"><Sparkles size={14} /> AI Voice Assistant</div>
+                <div className="visual-pill"><Sparkles size={14} /> {t('assistantTitle')}</div>
               </div>
               <div className="visual-mascot"><SwarAICircle size={220} /></div>
               <div className="visual-copy">
@@ -120,9 +120,9 @@ export default function AuthPage() {
                   {(mode === 'signin' || mode === 'signup') && (
                     <form className="auth-form" onSubmit={(e) => { e.preventDefault(); handleEmail(); }}>
                       {mode === 'signup' && (
-                        <label className="field"><span className="field-label">{t('name')}</span><div className="input-wrap"><input className="input" value={name} onChange={(e) => { setName(e.target.value); resetFeedback(); }} autoComplete="name" placeholder="Your name" /></div></label>
+                        <label className="field"><span className="field-label">{t('name')}</span><div className="input-wrap"><input className="input" value={name} onChange={(e) => { setName(e.target.value); resetFeedback(); }} autoComplete="name" placeholder={t('name')} /></div></label>
                       )}
-                      <label className="field"><span className="field-label">{t('email')}</span><div className="input-wrap"><Mail size={18} className="input-icon" /><input className="input" type="email" value={email} onChange={(e) => { setEmail(e.target.value); resetFeedback(); }} onFocus={() => setFocusField('email')} onBlur={() => setFocusField(null)} autoComplete="email" required placeholder="you@example.com" /></div></label>
+                      <label className="field"><span className="field-label">{t('email')}</span><div className="input-wrap"><Mail size={18} className="input-icon" /><input className="input" type="email" value={email} onChange={(e) => { setEmail(e.target.value); resetFeedback(); }} onFocus={() => setFocusField('email')} onBlur={() => setFocusField(null)} autoComplete="email" required placeholder="••••••••" /></div></label>
                       <label className="field"><span className="field-label">{t('password')}</span><div className="input-wrap"><Lock size={18} className="input-icon" /><input className="input" type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => { setPassword(e.target.value); resetFeedback(); }} onFocus={() => { setFocusField('password'); setMood('password'); }} onBlur={() => setFocusField(null)} autoComplete={mode === 'signup' ? 'new-password' : 'current-password'} required placeholder="••••••••" /><button type="button" className="eye-btn" onClick={() => setShowPassword((v) => !v)} aria-label={showPassword ? t('hidePassword') : t('showPassword')}>{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button></div></label>
                       {mode === 'signin' && <div className="form-row"><button type="button" className="link-btn" onClick={() => { setMode('reset'); resetFeedback(); }}>{t('forgotPassword')}</button></div>}
                       <button className="btn btn-primary submit-btn" type="submit" disabled={loading || notConfigured || !email || !password}>{loading ? <span className="btn-loading"><span className="spinner" />{mode === 'signup' ? t('creatingAccount') : t('signingIn')}</span> : <span className="btn-loading">{mode === 'signup' ? t('createAccount') : t('signIn')} <ArrowRight size={18} /></span>}</button>

@@ -22,7 +22,7 @@ export default function ConversationPanel({ messages, onSuggestion, onRepeat, on
   }, [messages, reduce]);
 
   return (
-    <div className="conversation" role="log" aria-live="polite" aria-label="Conversation">
+    <div className="conversation" role="log" aria-live="polite" aria-label={t('assistantTitle')}>
       {messages.length === 0 && (
         <div className="empty-state">
           <div className="empty-icon"><Bot size={28} /></div>
@@ -67,17 +67,17 @@ export default function ConversationPanel({ messages, onSuggestion, onRepeat, on
       </AnimatePresence>
       <div ref={endRef} />
       <style>{`
-        .conversation { flex: 1; overflow-y: auto; padding: 8px 4px 16px; display: flex; flex-direction: column; gap: 16px; min-height: 0; }
+        .conversation { flex: 1; overflow-y: auto; padding: 8px 4px 16px; display: flex; flex-direction: column; gap: 16px; min-height: 0; overscroll-behavior: contain; }
         .empty-state { margin: auto; text-align: center; color: var(--text-muted); padding: 40px 20px; }
         .empty-icon { width: 64px; height: 64px; border-radius: 20px; margin: 0 auto 16px; display: grid; place-items: center; background: rgba(255,107,53,0.1); color: var(--accent); }
         .empty-state p { margin: 0; font-size: 1.05rem; }
-        .msg { display: flex; gap: 12px; max-width: 92%; }
+        .msg { display: flex; gap: 12px; max-width: min(92%, 760px); }
         .msg-user { align-self: flex-end; flex-direction: row-reverse; }
         .msg-assistant { align-self: flex-start; }
         .msg-avatar { width: 36px; height: 36px; border-radius: 12px; flex-shrink: 0; display: grid; place-items: center; background: rgba(255,255,255,0.06); color: #ddd; }
         .msg-assistant .msg-avatar { background: rgba(255,107,53,0.15); color: var(--accent); }
         .msg-error .msg-avatar { background: rgba(255,77,77,0.15); color: #ff6b6b; }
-        .msg-body { padding: 14px 16px; border-radius: 18px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); min-width: 0; }
+        .msg-body { padding: 14px 16px; border-radius: 18px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); min-width: 0; max-width: 100%; overflow: hidden; }
         .msg-user .msg-body { background: linear-gradient(135deg, rgba(255,107,53,0.22), rgba(255,154,90,0.12)); border-color: rgba(255,107,53,0.25); }
         .msg-error .msg-body { border-color: rgba(255,77,77,0.3); }
         .msg-meta { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; flex-wrap: wrap; }
@@ -85,8 +85,9 @@ export default function ConversationPanel({ messages, onSuggestion, onRepeat, on
         .msg-actions { display: inline-flex; gap: 4px; flex-wrap: wrap; }
         .msg-action { display: inline-flex; align-items: center; gap: 4px; font-size: 0.78rem; color: var(--text-muted); padding: 4px 8px; border-radius: 6px; }
         .msg-action:hover { color: var(--accent); background: rgba(255,107,53,0.1); }
-        .msg-content { font-size: 1rem; line-height: 1.7; white-space: pre-wrap; word-break: break-word; }
-        @media (max-width: 640px) { .msg { max-width: 100%; } }
+        .msg-content { font-size: 1rem; line-height: 1.7; white-space: pre-wrap; word-break: break-word; overflow-wrap: anywhere; }
+        .msg-content pre, .msg-content code { max-width: 100%; overflow-x: auto; }
+        @media (max-width: 640px) { .msg { max-width: 100%; } .msg-body { padding: 12px 13px; } }
       `}</style>
     </div>
   );

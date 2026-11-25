@@ -10,7 +10,7 @@ export default function Features() {
     { icon: Mic, title: t('featureVoiceTitle'), desc: t('featureVoiceDesc') },
     { icon: Languages, title: t('featureLangTitle'), desc: t('featureLangDesc') },
     { icon: GraduationCap, title: t('tutorMode'), desc: t('tutorModeDesc') },
-    { icon: TranslateIcon, title: t('translateMode'), desc: 'Translate naturally between Telugu, Hindi, and English with voice support.' },
+    { icon: TranslateIcon, title: t('translateMode'), desc: t('solution4') },
     { icon: FileText, title: t('uploadDocument'), desc: t('documentHint') },
     { icon: Search, title: t('featureSmartTitle'), desc: t('featureSmartDesc') },
     { icon: Brain, title: t('memory'), desc: t('memoryConsentDesc') },

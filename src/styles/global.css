@@ -14,6 +14,8 @@
   --radius-lg: 24px;
   --shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
   --font: 'Inter', 'Noto Sans Devanagari', 'Noto Sans Telugu', system-ui, -apple-system, sans-serif;
+  --app-scale: 1;
+  --app-inv-scale: 1;
 }
 /* Dark mode is permanent. */
 [data-easy='true'] { font-size: 18px; }
@@ -23,7 +25,9 @@
 [data-easy='true'] .input { min-height: 56px; font-size: 1.05rem; }
 
 *, *::before, *::after { box-sizing: border-box; }
-html { scroll-behavior: smooth; }
+html { scroll-behavior: smooth; overflow-x: hidden; }
+body, #root { max-width: 100%; }
+img, video, canvas, svg { max-width: 100%; }
 section[id] { scroll-margin-top: 100px; }
 body {
   margin: 0;
@@ -34,7 +38,20 @@ body {
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
 }
-#root { min-height: 100vh; }
+#root {
+  min-height: calc(100vh * var(--app-inv-scale));
+  width: calc(100% * var(--app-inv-scale));
+  transform: scale(var(--app-scale));
+  transform-origin: top left;
+}
+@supports (zoom: 1) {
+  #root {
+    width: 100%;
+    min-height: 100vh;
+    transform: none;
+    zoom: var(--app-scale);
+  }
+}
 a { color: inherit; text-decoration: none; }
 button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
 input, select, textarea { font: inherit; color: inherit; background: transparent; border: none; outline: none; }

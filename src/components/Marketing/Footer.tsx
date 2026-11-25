@@ -10,8 +10,8 @@ export default function Footer() {
           <span className="brand-mark"><Mic size={18} /></span>
           <span>{t('appName')}</span>
         </div>
-        <p className="footer-msg">{t('footerMessage')}</p>
-        <p className="footer-copy">© {new Date().getFullYear()} SWAR AI</p>
+        <p className="footer-msg">{t('footerTagline')}</p>
+        <p className="footer-copy">© {new Date().getFullYear()} SWAR AI. {t('footerRights')}</p>
       </div>
       <style>{`
         .footer { padding: 48px 0 56px; border-top: 1px solid rgba(255,255,255,0.06); }

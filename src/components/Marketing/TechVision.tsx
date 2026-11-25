@@ -1,21 +1,23 @@
 import { Cpu, Waves, Database, Sparkles } from 'lucide-react';
 import Reveal from './Reveal';
+import { useLanguage } from '@/context/LanguageContext';
 
 export default function TechVision() {
+  const { t } = useLanguage();
   const tech = [
-    { icon: Waves, title: 'Speech Technology', desc: 'Browser speech recognition and synthesis for real-time voice interaction.' },
-    { icon: Cpu, title: 'AI Backend', desc: 'OpenCode Zen chat completions API with mode-aware prompts and structured responses.' },
-    { icon: Database, title: 'Supabase Ready', desc: 'Schema and RLS for profiles, conversations, memories, and usage stats.' },
-    { icon: Sparkles, title: 'Modern Frontend', desc: 'React, Vite, TypeScript, and Framer Motion for a fast premium experience.' },
+    { icon: Waves, title: t('techSpeechTitle'), desc: t('techSpeechDesc') },
+    { icon: Cpu, title: t('techAiTitle'), desc: t('techAiDesc') },
+    { icon: Database, title: t('techDataTitle'), desc: t('techDataDesc') },
+    { icon: Sparkles, title: t('techFrontendTitle'), desc: t('techFrontendDesc') },
   ];
   return (
     <section className="section" id="technology">
       <div className="container">
         <div className="tech-vision-grid">
           <Reveal>
-            <span className="eyebrow">Technology</span>
-            <h2 className="section-title"><span className="gradient-text">Built on modern, practical foundations</span></h2>
-            <p className="section-subtitle">SWAR AI combines voice interfaces, AI, and secure data patterns into one accessible product.</p>
+            <span className="eyebrow">{t('navTechnology')}</span>
+            <h2 className="section-title"><span className="gradient-text">{t('techVisionTitle')}</span></h2>
+            <p className="section-subtitle">{t('techSubtitle')}</p>
             <div className="tech-list">
               {tech.map((t, i) => (
                 <Reveal key={t.title} delay={i * 0.06} className="tech-item">
@@ -26,12 +28,12 @@ export default function TechVision() {
             </div>
           </Reveal>
           <Reveal delay={0.15} className="vision-card glass">
-            <span className="eyebrow">Vision</span>
+            <span className="eyebrow">{t('visionEyebrow')}</span>
             <h2 style={{ fontSize: 'clamp(1.8rem,3vw,2.8rem)', margin: '0 0 20px', lineHeight: 1.15, letterSpacing: '-0.02em' }}>
-              A future where everyone can <span className="gradient-text">talk to technology</span>.
+              <span className="gradient-text">{t('visionTitle')}</span>
             </h2>
             <p style={{ color: 'var(--text-muted)', lineHeight: 1.8, margin: '0 0 24px' }}>
-              SWAR AI is moving toward a more personal, capable, and accessible voice assistant—one that understands language, context, and people.
+              {t('visionDesc')}
             </p>
             <div className="vision-wave" aria-hidden>
               {Array.from({ length: 32 }).map((_, i) => <span key={i} style={{ animationDelay: `${i * 0.05}s`, height: `${18 + Math.abs(Math.sin(i * 0.4)) * 82}%` }} />)}

@@ -10,17 +10,17 @@ export default function LivePreview() {
     <section className="section" id="live-preview">
       <div className="container preview-grid">
         <Reveal>
-          <span className="eyebrow">Live Assistant Preview</span>
-          <h2 className="section-title"><span className="gradient-text">Experience SWAR AI in action</span></h2>
+          <span className="eyebrow">{t('previewEyebrow')}</span>
+          <h2 className="section-title"><span className="gradient-text">{t('livePreviewTitle')}</span></h2>
           <p className="section-subtitle" style={{ marginBottom: 28 }}>
-            A voice-first interface designed for clarity: speak, get answers, and explore suggestions in your language.
+            {t('livePreviewDesc')}
           </p>
           <div className="preview-points">
             {[
-              { icon: Mic, text: 'Tap to speak with real-time listening feedback.' },
-              { icon: Volume2, text: 'Hear natural responses with voice playback controls.' },
-              { icon: MessageSquare, text: 'Read transcripts and follow smart suggestions.' },
-              { icon: Sparkles, text: 'Switch modes: tutor, translate, document, and more.' },
+              { icon: Mic, text: t('previewPoint1') },
+              { icon: Volume2, text: t('previewPoint2') },
+              { icon: MessageSquare, text: t('previewPoint3') },
+              { icon: Sparkles, text: t('previewPoint4') },
             ].map((p) => (
               <div key={p.text} className="preview-point"><span className="pp-icon"><p.icon size={16} /></span><span>{p.text}</span></div>
             ))}

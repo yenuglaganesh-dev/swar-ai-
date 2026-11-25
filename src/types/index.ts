@@ -28,6 +28,9 @@ export interface UserProfile {
   provider: 'email' | 'google' | 'phone' | 'guest';
 }
 
+export type DisplayScale = 0.75 | 0.8 | 0.9 | 1 | 1.1 | 1.25 | 1.5;
+export type ChatPanelMode = 'compact' | 'comfortable';
+
 export interface UserSettings {
   preferredLanguage: LanguageCode;
   autoDetectLanguage: boolean;
@@ -38,7 +41,14 @@ export interface UserSettings {
   continuousMode: boolean;
   memoryConsent: boolean;
   saveAudio: boolean;
+  displayScale: DisplayScale;
+  chatPanelWidth: number;
+  chatPanelHeight: number;
+  chatPanelMode: ChatPanelMode;
+  chatFullscreen: boolean;
 }
+
+export const DISPLAY_SCALES: DisplayScale[] = [0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5];
 
 export const DEFAULT_SETTINGS: UserSettings = {
   preferredLanguage: 'en-IN',
@@ -50,4 +60,9 @@ export const DEFAULT_SETTINGS: UserSettings = {
   continuousMode: false,
   memoryConsent: false,
   saveAudio: false,
+  displayScale: 1,
+  chatPanelWidth: 560,
+  chatPanelHeight: 720,
+  chatPanelMode: 'comfortable',
+  chatFullscreen: false,
 };

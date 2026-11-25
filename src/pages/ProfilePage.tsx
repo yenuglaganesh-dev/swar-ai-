@@ -3,6 +3,7 @@ import { Link, Navigate } from 'react-router-dom';
 import { ArrowLeft, LogOut, User, Save, Shield } from 'lucide-react';
 import PageShell from '@/components/Layout/PageShell';
 import LanguageSelector from '@/components/Layout/LanguageSelector';
+import DisplaySettingsPanel from '@/components/Settings/DisplaySettingsPanel';
 import { useLanguage } from '@/context/LanguageContext';
 import { useSettings } from '@/context/SettingsContext';
 import { useAuth } from '@/context/AuthContext';
@@ -30,10 +31,11 @@ export default function ProfilePage() {
             <div className="profile-head">
               <div className="profile-avatar"><User size={28} /></div>
               <div>
-                <h1>{t('profile')}</h1>
+                <h1>{t('profileTitle')}</h1>
                 <p>{user.name}</p>
               </div>
             </div>
+            <p style={{ color: 'var(--text-muted)', marginTop: -8, marginBottom: 20 }}>{t('profileIntro')}</p>
 
             <div className="profile-grid">
               <div className="profile-field">
@@ -46,6 +48,7 @@ export default function ProfilePage() {
 
             <div className="settings-section">
               <h2>{t('settings')}</h2>
+              <DisplaySettingsPanel showChatControls={true} />
               <div className="setting-row">
                 <div>
                   <div className="setting-label">{t('preferredLanguage')}</div>
@@ -80,7 +83,7 @@ export default function ProfilePage() {
             </div>
 
             <div className="profile-actions">
-              <button className="btn btn-primary" onClick={save}><Save size={16} /> {saved ? t('saved') : t('save')}</button>
+              <button className="btn btn-primary" onClick={save}><Save size={16} /> {saved ? t('savedSettings') : t('saveSettings')}</button>
               <button className="btn btn-secondary" onClick={() => signOut()}><LogOut size={16} /> {t('navSignOut')}</button>
             </div>
           </div>

@@ -5,16 +5,18 @@ import AuthPage from './pages/AuthPage';
 import ProfilePage from './pages/ProfilePage';
 import DashboardPage from './pages/DashboardPage';
 import { useAuth } from '@/context/AuthContext';
+import { useLanguage } from '@/context/LanguageContext';
 import PageShell from '@/components/Layout/PageShell';
 import SwarMascot from '@/components/Auth/SwarMascot';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
+  const { t } = useLanguage();
   if (loading) return (
     <PageShell>
       <div className="container" style={{ paddingTop: 140, display: 'grid', placeItems: 'center', gap: 16, color: 'var(--text-muted)' }}>
         <div style={{ width: 180 }}><SwarMascot state="processing" size="100%" /></div>
-        <div>Loading...</div>
+        <div>{t('loadingLabel')}</div>
       </div>
     </PageShell>
   );

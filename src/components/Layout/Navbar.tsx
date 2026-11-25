@@ -1,15 +1,24 @@
 import { useEffect, useState } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
-import { Menu, X, Mic, User } from 'lucide-react';
+import { Menu, X, Mic, User, Minus, Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
+import { useSettings } from '@/context/SettingsContext';
+import { DISPLAY_SCALES } from '@/types';
 import LanguageSelector from './LanguageSelector';
 
 export default function Navbar() {
   const { t } = useLanguage();
   const { user } = useAuth();
+  const { settings, updateSettings } = useSettings();
   const [open, setOpen] = useState(false);
+  const scaleIndex = DISPLAY_SCALES.indexOf(settings.displayScale);
+  const zoomPct = Math.round(settings.displayScale * 100);
+  const setScaleIndex = (idx: number) => {
+    const clamped = Math.max(0, Math.min(DISPLAY_SCALES.length - 1, idx));
+    updateSettings({ displayScale: DISPLAY_SCALES[clamped] });
+  };
   const [scrolled, setScrolled] = useState(false);
   const [active, setActive] = useState('#top');
   const location = useLocation();
@@ -17,10 +26,10 @@ export default function Navbar() {
 
   const navItems = [
     { label: t('navHome'), href: '/', hash: '#top' },
-    { label: 'About', href: '/', hash: '#about' },
+    { label: t('navAbout'), href: '/', hash: '#about' },
     { label: t('navFeatures'), href: '/', hash: '#features' },
     { label: t('navHow'), href: '/', hash: '#how' },
-    { label: 'Technology', href: '/', hash: '#technology' },
+    { label: t('navTechnology'), href: '/', hash: '#technology' },
   ];
 
   useEffect(() => {
@@ -66,7 +75,7 @@ export default function Navbar() {
   return (
     <header className={`nav-wrap ${scrolled ? 'scrolled' : ''}`}>
       <nav className="nav container">
-        <Link to="/" className="brand" aria-label="SWAR AI home">
+        <Link to="/" className="brand" aria-label={t('homeAria')}>
           <span className="brand-mark"><Mic size={18} /></span>
           <span className="brand-name">{t('appName')}</span>
         </Link>
@@ -81,6 +90,11 @@ export default function Navbar() {
         </div>
 
         <div className="nav-actions desktop">
+          <div className="zoom-quick" role="group" aria-label={t('websiteDisplaySize')}>
+            <button className="btn btn-secondary btn-icon btn-sm" onClick={() => setScaleIndex(scaleIndex - 1)} disabled={scaleIndex <= 0} aria-label={t('zoomOut')}><Minus size={14} /></button>
+            <button className="zoom-pct-btn" onClick={() => updateSettings({ displayScale: 1 })} aria-label={t('resetToDefault')} title={t('resetToDefault')}>{zoomPct}%</button>
+            <button className="btn btn-secondary btn-icon btn-sm" onClick={() => setScaleIndex(scaleIndex + 1)} disabled={scaleIndex >= DISPLAY_SCALES.length - 1} aria-label={t('zoomIn')}><Plus size={14} /></button>
+          </div>
           <LanguageSelector compact />
           <Link to="/assistant" className="btn btn-primary btn-sm"><Mic size={16} />{t('startTalking')}</Link>
           <Link to={user ? '/profile' : '/auth'} className="btn btn-secondary btn-icon" aria-label={user ? t('navProfile') : t('navSignIn')}>
@@ -88,7 +102,7 @@ export default function Navbar() {
           </Link>
         </div>
 
-        <button className="mobile-toggle btn btn-secondary btn-icon" onClick={() => setOpen(!open)} aria-label="Menu" aria-expanded={open}>
+        <button className="mobile-toggle btn btn-secondary btn-icon" onClick={() => setOpen(!open)} aria-label={t('menu')} aria-expanded={open}>
           {open ? <X size={20} /> : <Menu size={20} />}
         </button>
       </nav>
@@ -97,6 +111,12 @@ export default function Navbar() {
         {open && (
           <motion.div className="mobile-menu glass" initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
             <div className="container mobile-menu-inner">
+              <div className="zoom-quick mobile-zoom" role="group" aria-label={t('websiteDisplaySize')}>
+                <button className="btn btn-secondary btn-icon btn-sm" onClick={() => setScaleIndex(scaleIndex - 1)} disabled={scaleIndex <= 0} aria-label={t('zoomOut')}><Minus size={14} /></button>
+                <span className="zoom-pct-mobile" aria-live="polite">{zoomPct}%</span>
+                <button className="btn btn-secondary btn-icon btn-sm" onClick={() => setScaleIndex(scaleIndex + 1)} disabled={scaleIndex >= DISPLAY_SCALES.length - 1} aria-label={t('zoomIn')}><Plus size={14} /></button>
+                <button className="btn btn-secondary btn-sm" onClick={() => updateSettings({ displayScale: 1 })}>{t('resetToDefault')}</button>
+              </div>
               <LanguageSelector />
               {onHome ? navItems.map((item) => (
                 <button key={item.hash} className={`mobile-link ${active === item.hash ? 'active' : ''}`} onClick={() => goHash(item.hash)}>{item.label}</button>
@@ -124,6 +144,11 @@ export default function Navbar() {
         .nav-link.active { color: #fff; }
         .nav-link.active::after { content: ''; position: absolute; left: 14px; right: 14px; bottom: 5px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
         .nav-actions { display: flex; align-items: center; gap: 10px; }
+        .zoom-quick { display:inline-flex; align-items:center; gap:6px; padding:4px; border-radius:12px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); }
+        .zoom-pct-btn { min-width:52px; padding:6px 8px; color:#fff; font-size:.82rem; font-weight:700; border-radius:8px; }
+        .zoom-pct-btn:hover { background:rgba(255,255,255,0.06); color:var(--accent-2); }
+        .zoom-pct-mobile { min-width:52px; text-align:center; font-weight:700; color:var(--accent-2); font-size:.9rem; }
+        .mobile-zoom { justify-content:flex-start; flex-wrap:wrap; margin-bottom:8px; }
         .mobile-toggle { display: none; }
         .mobile-menu { position: absolute; top: calc(100% + 4px); left: 16px; right: 16px; border-radius: 20px; }
         .mobile-menu-inner { display: flex; flex-direction: column; gap: 8px; padding: 20px 0; width: calc(100% - 40px); }

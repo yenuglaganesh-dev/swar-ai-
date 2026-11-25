@@ -5,6 +5,7 @@ import PageShell from '@/components/Layout/PageShell';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { useSettings } from '@/context/SettingsContext';
+import DisplaySettingsPanel from '@/components/Settings/DisplaySettingsPanel';
 import { listConversations, listMemories, getUsageStats, clearMemories, deleteConversation, ConversationRecord, MemoryItem } from '@/services/dataStore';
 import { isSupabaseConfigured } from '@/services/supabase';
 import { safeStorage } from '@/services/safeStorage';
@@ -43,17 +44,17 @@ export default function DashboardPage() {
       <div className="profile-page"><div className="container profile-container">
         <Link to="/assistant" className="back-link"><ArrowLeft size={18} /> {t('back')}</Link>
         <div className="profile-card glass">
-          <h1 style={{ marginTop: 0 }}>{t('dashboard')}</h1>
-          <p style={{ color: 'var(--text-muted)' }}>{t('dashboardIntro')}</p>
+          <h1 style={{ marginTop: 0 }}>{t('dashboardTitleLong')}</h1>
+          <p style={{ color: 'var(--text-muted)' }}>{t('dashboardIntroLong')}</p>
           {!isSupabaseConfigured() && <div className="notice"><AlertTriangle size={16} />{t('supabaseNotConfigured')}</div>}
           {msg && <div className="notice">{msg}</div>}
 
           <section className="dash-section">
-            <h2><BarChart3 size={18} /> {t('usageStats')}</h2>
+            <h2><BarChart3 size={18} /> {t('usageTitle')}</h2>
             <div className="stats-grid">
-              <div className="stat glass"><div className="stat-n">{stats.total}</div><div className="stat-l">{t('totalInteractions')}</div></div>
-              <div className="stat glass"><div className="stat-n">{stats.byType.voice_start || 0}</div><div className="stat-l"><Mic size={14} /> {t('voiceInteractions')}</div></div>
-              <div className="stat glass"><div className="stat-n">{stats.byType.message_sent || 0}</div><div className="stat-l"><Type size={14} /> {t('textInteractions')}</div></div>
+              <div className="stat glass"><div className="stat-n">{stats.total}</div><div className="stat-l">{t('total')}</div></div>
+              <div className="stat glass"><div className="stat-n">{stats.byType.voice_start || 0}</div><div className="stat-l"><Mic size={14} /> {t('voice')}</div></div>
+              <div className="stat glass"><div className="stat-n">{stats.byType.message_sent || 0}</div><div className="stat-l"><Type size={14} /> {t('text')}</div></div>
             </div>
           </section>
 
@@ -62,11 +63,16 @@ export default function DashboardPage() {
             {convos.length === 0 ? <p style={{ color: 'var(--text-muted)' }}>{t('noConversations')}</p> : (
               <div className="list">{convos.map((c) => (
                 <div key={c.id} className="list-item glass">
-                  <div><div style={{ fontWeight: 600 }}>{c.title || 'Conversation'}</div><div style={{ color: 'var(--text-muted)', fontSize: '.85rem' }}>{new Date(c.updated_at).toLocaleString()}</div></div>
-                  <button className="btn btn-ghost btn-icon" onClick={async () => { await deleteConversation(user.uid, c.id); load(); }} aria-label="Delete"><Trash2 size={16} /></button>
+                  <div><div style={{ fontWeight: 600 }}>{c.title || t('recentConversations')}</div><div style={{ color: 'var(--text-muted)', fontSize: '.85rem' }}>{new Date(c.updated_at).toLocaleString()}</div></div>
+                  <button className="btn btn-ghost btn-icon" onClick={async () => { await deleteConversation(user.uid, c.id); load(); }} aria-label={t('deleteDataBtn')}><Trash2 size={16} /></button>
                 </div>
               ))}</div>
             )}
+          </section>
+
+          <section className="dash-section">
+            <h2><Shield size={18} /> {t('displaySettings')}</h2>
+            <DisplaySettingsPanel showChatControls={true} />
           </section>
 
           <section className="dash-section">

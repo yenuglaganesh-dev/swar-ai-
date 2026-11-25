@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { DEFAULT_SETTINGS, UserSettings } from '@/types';
+import { DEFAULT_SETTINGS, DISPLAY_SCALES, DisplayScale, ChatPanelMode, UserSettings } from '@/types';
 import { safeStorage, safeJsonParse } from '@/services/safeStorage';
 
 interface SettingsContextValue {
@@ -11,6 +11,11 @@ const SettingsContext = createContext<SettingsContextValue | null>(null);
 const STORAGE_KEY = 'swar_settings';
 
 function normalizeSettings(parsed: any): UserSettings {
+  const scale = Number(parsed?.displayScale);
+  const displayScale = (DISPLAY_SCALES as number[]).includes(scale) ? (scale as DisplayScale) : DEFAULT_SETTINGS.displayScale;
+  const chatPanelMode: ChatPanelMode = parsed?.chatPanelMode === 'compact' ? 'compact' : 'comfortable';
+  const width = Number(parsed?.chatPanelWidth);
+  const height = Number(parsed?.chatPanelHeight);
   return {
     ...DEFAULT_SETTINGS,
     ...(parsed && typeof parsed === 'object' ? parsed : {}),
@@ -18,6 +23,11 @@ function normalizeSettings(parsed: any): UserSettings {
       ? parsed.preferredLanguage
       : DEFAULT_SETTINGS.preferredLanguage,
     speechRate: typeof parsed?.speechRate === 'number' ? Math.min(1.5, Math.max(0.7, parsed.speechRate)) : DEFAULT_SETTINGS.speechRate,
+    displayScale,
+    chatPanelMode,
+    chatPanelWidth: Number.isFinite(width) ? Math.min(1200, Math.max(320, width)) : DEFAULT_SETTINGS.chatPanelWidth,
+    chatPanelHeight: Number.isFinite(height) ? Math.min(1200, Math.max(420, height)) : DEFAULT_SETTINGS.chatPanelHeight,
+    chatFullscreen: Boolean(parsed?.chatFullscreen),
   };
 }
 
@@ -51,9 +61,12 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    document.documentElement.dataset.theme = 'dark';
-    document.documentElement.dataset.easy = settings.easyMode ? 'true' : 'false';
-  }, [settings.easyMode]);
+    const root = document.documentElement;
+    root.dataset.theme = 'dark';
+    root.dataset.easy = settings.easyMode ? 'true' : 'false';
+    root.style.setProperty('--app-scale', String(settings.displayScale));
+    root.style.setProperty('--app-inv-scale', String(1 / settings.displayScale));
+  }, [settings.easyMode, settings.displayScale]);
 
   const value = useMemo(() => ({ settings, updateSettings }), [settings]);
   return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;

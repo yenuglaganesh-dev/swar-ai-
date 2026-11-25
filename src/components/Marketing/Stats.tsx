@@ -1,22 +1,24 @@
 import { useReducedMotion } from 'framer-motion';
 import AnimatedCounter from './AnimatedCounter';
 import Reveal from './Reveal';
+import { useLanguage } from '@/context/LanguageContext';
 
 export default function Stats() {
+  const { t } = useLanguage();
   const reduce = useReducedMotion();
   const stats = [
-    { value: 3, suffix: '', label: 'Languages supported', note: 'Telugu, Hindi, English' },
-    { value: 8, suffix: '+', label: 'Core AI capabilities', note: 'Voice, tutor, translation, memory & more' },
-    { value: 100, suffix: '%', label: 'Voice-first focus', note: 'Designed for natural conversation' },
+    { value: 3, suffix: '', label: t('statLangLabel'), note: t('statLangNote') },
+    { value: 8, suffix: '+', label: t('statCapLabel'), note: t('statCapNote') },
+    { value: 100, suffix: '%', label: t('statVoiceLabel'), note: t('statVoiceNote') },
   ];
 
   return (
     <section className="section">
       <div className="container">
         <Reveal className="section-head center">
-          <span className="eyebrow">Real capabilities</span>
-          <h2 className="section-title"><span className="gradient-text">Built to be useful, not just impressive</span></h2>
-          <p className="section-subtitle" style={{ margin: '0 auto' }}>These numbers reflect actual SWAR AI capabilities included in this product.</p>
+          <span className="eyebrow">{t('statsEyebrow')}</span>
+          <h2 className="section-title"><span className="gradient-text">{t('statsTitle')}</span></h2>
+          <p className="section-subtitle" style={{ margin: '0 auto' }}>{t('statsDesc')}</p>
         </Reveal>
         <div className="stats-grid">
           {stats.map((s, i) => (

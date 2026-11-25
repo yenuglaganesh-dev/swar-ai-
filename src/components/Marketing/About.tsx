@@ -8,20 +8,20 @@ export default function About() {
     <section className="section" id="about">
       <div className="container about-grid">
         <Reveal>
-          <span className="eyebrow">About SWAR AI</span>
+          <span className="eyebrow">{t('aboutEyebrow')}</span>
           <h2 className="section-title"><span className="gradient-text">{t('mission')}</span></h2>
           <p className="section-subtitle" style={{ marginBottom: 24 }}>
-            SWAR AI is a voice-first multilingual assistant designed to make technology feel natural. Speak in Telugu, Hindi, or English and get clear, helpful answers through conversation.
+            {t('aboutDesc')}
           </p>
           <p style={{ color: 'var(--text-muted)', lineHeight: 1.8, margin: 0 }}>
-            Built for accessibility and everyday usefulness, SWAR AI combines speech recognition, natural AI responses, and expressive voice output in a premium, easy-to-use experience.
+            {t('aboutDesc2')}
           </p>
         </Reveal>
         <Reveal delay={0.12} className="about-cards">
           {[
-            { icon: Mic, title: 'Voice-first', desc: 'Speak naturally instead of typing. Designed for real conversations.' },
-            { icon: Globe, title: 'Multilingual', desc: 'Understands Telugu, Hindi, and English with auto-detection.' },
-            { icon: Shield, title: 'Privacy-aware', desc: 'Permissions on demand, consent for memory, and clear data controls.' },
+            { icon: Mic, title: t('aboutVoiceTitle'), desc: t('aboutVoiceDesc') },
+            { icon: Globe, title: t('aboutLangTitle'), desc: t('aboutLangDesc') },
+            { icon: Shield, title: t('aboutPrivacyTitle'), desc: t('aboutPrivacyDesc') },
           ].map((c) => (
             <div key={c.title} className="about-card glass">
               <div className="about-icon"><c.icon size={20} /></div>

@@ -15,8 +15,9 @@ export default function HowItWorks() {
     <section className="section" id="how">
       <div className="container">
         <Reveal className="section-head center">
-          <span className="eyebrow">Simple flow</span>
+          <span className="eyebrow">{t('howTitle')}</span>
           <h2 className="section-title"><span className="gradient-text">{t('howTitle')}</span></h2>
+          <p className="section-subtitle" style={{ margin: '0 auto' }}>{t('howSubtitle')}</p>
         </Reveal>
         <div className="steps">
           {steps.map((s, i) => (

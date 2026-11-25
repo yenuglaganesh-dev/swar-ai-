@@ -13,11 +13,11 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <ErrorBoundary>
       <BrowserRouter>
         <SettingsProvider>
-          <LanguageProvider>
-            <AuthProvider>
+          <AuthProvider>
+            <LanguageProvider>
               <App />
-            </AuthProvider>
-          </LanguageProvider>
+            </LanguageProvider>
+          </AuthProvider>
         </SettingsProvider>
       </BrowserRouter>
     </ErrorBoundary>

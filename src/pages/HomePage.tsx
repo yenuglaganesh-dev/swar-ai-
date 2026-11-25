@@ -42,7 +42,7 @@ export default function HomePage() {
           <div className="container">
             <Reveal className="cta glass">
               <div>
-                <span className="eyebrow">Get started</span>
+                <span className="eyebrow">{t('getStarted')}</span>
                 <h2 className="section-title" style={{ marginBottom: 12 }}><span className="gradient-text">{t('trySwar')}</span></h2>
                 <p className="section-subtitle">{t('mission')}</p>
               </div>

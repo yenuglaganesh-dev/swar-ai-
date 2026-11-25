@@ -11,17 +11,28 @@ export function isSpeechRecognitionSupported(): boolean {
   return typeof window !== 'undefined' && (!!window.SpeechRecognition || !!window.webkitSpeechRecognition);
 }
 
-export function createRecognition(lang: LanguageCode, handlers: RecognitionHandlers) {
+export function createRecognition(lang: LanguageCode, handlers: RecognitionHandlers, continuous = false) {
   const Ctor = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!Ctor) return null;
   const recognition = new Ctor();
   recognition.lang = lang;
   recognition.interimResults = true;
-  recognition.continuous = false;
+  recognition.continuous = continuous;
   recognition.maxAlternatives = 1;
 
-  recognition.onstart = () => handlers.onStart?.();
-  recognition.onend = () => handlers.onEnd?.();
+  let isRestarting = false;
+
+  recognition.onstart = () => {
+    isRestarting = false;
+    handlers.onStart?.();
+  };
+  recognition.onend = () => {
+    if (continuous && !isRestarting) {
+      isRestarting = true;
+      try { recognition.start(); } catch {}
+    }
+    handlers.onEnd?.();
+  };
   recognition.onerror = (e: Event) => {
     const err = (e as unknown as { error?: string }).error || 'recognition_error';
     handlers.onError?.(err);
@@ -47,6 +58,7 @@ export function createRecognition(lang: LanguageCode, handlers: RecognitionHandl
       }
     },
     stop() {
+      isRestarting = false;
       try {
         recognition.stop();
       } catch {
@@ -54,6 +66,7 @@ export function createRecognition(lang: LanguageCode, handlers: RecognitionHandl
       }
     },
     abort() {
+      isRestarting = false;
       try {
         recognition.abort();
       } catch {

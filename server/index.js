@@ -40,7 +40,7 @@ const LANG_NAMES = {
 
 function buildSystemPrompt(language, autoDetect, context = {}) {
   const langName = LANG_NAMES[language] || 'English';
-  const { mode, memories = [], documentText = '', imageAttached = false, location = '' } = context;
+  const { mode, memories = [], documentText = '', location = '' } = context;
   const modeHint = mode === 'tutor' ? 'Act as a patient educational tutor. Explain concepts step by step, check understanding, and give simple examples.'
     : mode === 'simple' ? 'Explain in very simple words, short sentences, and small steps. Avoid jargon.'
     : mode === 'translate' ? 'Focus on accurate translation between Telugu, Hindi, and English. Provide the translation clearly and briefly explain meaning if helpful.'
@@ -56,7 +56,6 @@ function buildSystemPrompt(language, autoDetect, context = {}) {
     modeHint,
     memories.length ? `User memory (only use if relevant, user consented): ${memories.slice(0, 8).map((m) => `- ${m}`).join(' ')}` : 'No personal memory is available.',
     documentText ? `Document context provided by user (use it to answer/explain):\n${documentText.slice(0, 12000)}` : '',
-    imageAttached ? 'The user attached an image. If image content is provided, describe/answer based on it; if not, ask them to describe it.' : '',
     location ? `User location hint: ${location}` : '',
     'Keep answers clear, simple, warm, and respectful. Avoid unnecessarily complicated vocabulary.',
     'You can help with general questions, education, everyday assistance, technology, language translation/explanation, recommendations, and step-by-step guidance.',
@@ -92,38 +91,42 @@ function fallbackResponse(_message, language, reason = 'AI_SERVICE_UNAVAILABLE')
   const lang = LANG_NAMES[language] ? language : 'en-IN';
   const details = {
     AI_NOT_CONFIGURED: {
-      'en-IN': 'The AI service is not configured on the server. Add AI_API_KEY in the server .env file and restart the backend.',
-      'hi-IN': 'सर्वर पर AI सेवा कॉन्फ़िगर नहीं है। सर्वर .env में AI_API_KEY जोड़ें और बैकएंड रीस्टार्ट करें।',
-      'te-IN': 'సర్వర్‌లో AI సర్వీస్ కాన్ఫిగర్ చేయలేదు. సర్వర్ .env లో AI_API_KEY జోడించి బ్యాకెండ్‌ను రీస్టార్ట్ చేయండి.',
+      'en-IN': 'The AI service is not configured on the server. Add GEMINI_API_KEY in the server .env file and restart the backend.',
+      'hi-IN': 'सर्वर पर AI सेवा कॉन्फ़िगर नहीं है। सर्वर .env में GEMINI_API_KEY जोड़ें और बैकएंड रीस्टार्ट करें।',
+      'te-IN': 'సర్వర్‌లో AI సర్వీస్ కాన్ఫిగర్ చేయలేదు. సర్వర్ .env లో GEMINI_API_KEY జోడించి బ్యాకెండ్‌ను రీస్టార్ట్ చేయండి.',
     },
     AI_UPSTREAM_ERROR: {
-      'en-IN': 'The AI provider returned an error. Check AI_API_KEY, AI_API_URL, model access, and server logs.',
-      'hi-IN': 'AI प्रदाता ने त्रुटि लौटाई। AI_API_KEY, AI_API_URL, मॉडल एक्सेस और सर्वर लॉग जांचें।',
-      'te-IN': 'AI ప్రొవైడర్ లోపాన్ని తిరిగి ఇచ్చింది. AI_API_KEY, AI_API_URL, మోడల్ యాక్సెస్ మరియు సర్వర్ లాగ్‌లను తనిఖీ చేయండి.',
+      'en-IN': 'The AI provider returned an error. Check GEMINI_API_KEY, GEMINI_API_URL, model access, and server logs.',
+      'hi-IN': 'AI प्रदाता ने त्रुटि लौटाई। GEMINI_API_KEY, GEMINI_API_URL, मॉडल एक्सेस और सर्वर लॉग जांचें।',
+      'te-IN': 'AI ప్రొవైడర్ లోపాన్ని తిరిగి ఇచ్చింది. GEMINI_API_KEY, GEMINI_API_URL, మోడల్ యాక్సెస్ మరియు సర్వర్ లాగ్‌లను తనిఖీ చేయండి.',
     },
     AI_SERVICE_UNAVAILABLE: {
       'en-IN': "I'm having trouble reaching the AI service right now. Please check the server configuration and try again.",
       'hi-IN': 'अभी AI सेवा तक पहुंचने में समस्या हो रही है। कृपया सर्वर कॉन्फ़िगरेशन जांचें और फिर प्रयास करें।',
-      'te-IN': 'ఇప్పుడు AI సర్వీస్‌ను చేరుకోవడంలో సమస్య ఉంది. దయచేసి సర్వర్ కాన్ఫిగరేషన్ తనిఖీ చేసి మళ్లీ ప్రయత్నించండి.',
+      'te-IN': 'ఇప్పుడు AI సర్విస్‌ను చేరుకోవడంలో సమస్య ఉంది. దయచేసి సర్వర్ కాన్ఫిగరیشن తనిఖీ చేసి మళ్లీ ప్రయత్నించండి.',
     },
   };
   const detail = (details[reason] || details.AI_SERVICE_UNAVAILABLE)[lang];
   const suggestions = {
     'en-IN': ['Try again', 'Check server config', 'What can you do?'],
     'hi-IN': ['फिर प्रयास करें', 'सर्वर कॉन्फ़िग जांचें', 'आप क्या कर सकते हैं?'],
-    'te-IN': ['మళ్లీ ప్రయత్నించండి', 'సర్వర్ కాన్ఫిగ్ తనిఖీ చేయండి', 'మీరు ఏమి చేయగలరు?'],
+    'te-IN': ['మళ్లి ప్రయత్నించండి', 'సర్వర్ కాన్ఫిగ్ తనిఖీ చేయండి', 'మీరు ఏమి చేయగలరు?'],
   };
   return { reply: detail, detectedLanguage: lang, suggestions: suggestions[lang], error: reason };
+}
+
+function isPlaceholderKey(key) {
+  if (!key) return true;
+  const lower = key.toLowerCase().trim();
+  return lower === 'your_ai_api_key_here' || lower === 'your_gemini_api_key_here' || lower === 'your_opencode_api_key_here' || lower === 'sk-...' || lower === 'paste-your-key-here';
 }
 
 app.get('/api/health', (_req, res) => {
   res.json({
     ok: true,
     name: 'SWAR AI',
-    aiConfigured: Boolean(process.env.AI_API_KEY),
-    weatherConfigured: Boolean(process.env.WEATHER_API_KEY),
-    newsConfigured: Boolean(process.env.NEWS_API_KEY),
-    visionModel: process.env.AI_VISION_MODEL || process.env.AI_MODEL || 'gpt-4o-mini',
+    aiConfigured: Boolean(process.env.GEMINI_API_KEY) && !isPlaceholderKey(process.env.GEMINI_API_KEY),
+    visionModel: process.env.GEMINI_VISION_MODEL || process.env.GEMINI_MODEL || 'gemini-3-flash-preview',
     time: new Date().toISOString(),
   });
 });
@@ -171,12 +174,10 @@ async function fetchNews(query) {
   if (!key) return { ok: false, configured: false, error: 'NEWS_NOT_CONFIGURED', message: 'NEWS_API_KEY is not configured on the server.' };
   const q = String(query || 'India').trim().slice(0, 120) || 'India';
   try {
-    // Free NewsAPI plan: top-headlines works; development often restricted to localhost and limited requests.
     const url = `https://newsapi.org/v2/top-headlines?q=${encodeURIComponent(q)}&pageSize=5&language=en&apiKey=${key}`;
     let r = await fetch(url);
     let raw = await r.text().catch(() => '');
     let d = parseJsonSafe(raw) || {};
-    // Fallback to everything endpoint for broader queries if top-headlines returns empty.
     if (r.ok && Array.isArray(d.articles) && d.articles.length === 0) {
       const url2 = `https://newsapi.org/v2/everything?q=${encodeURIComponent(q)}&pageSize=5&sortBy=publishedAt&language=en&apiKey=${key}`;
       r = await fetch(url2);
@@ -220,7 +221,7 @@ app.post('/api/news', async (req, res) => {
 });
 
 app.post('/api/chat', async (req, res) => {
-  const { messages = [], language = 'en-IN', autoDetect = false, mode = 'default', memories = [], documentText = '', imageDataUrl = '', locationHint = '' } = req.body || {};
+  const { messages = [], language = 'en-IN', autoDetect = false, mode = 'default', memories = [], documentText = '', locationHint = '' } = req.body || {};
 
   if (!Array.isArray(messages)) {
     return res.status(400).json({ error: 'messages must be an array' });
@@ -231,15 +232,19 @@ app.post('/api/chat', async (req, res) => {
     .slice(-12)
     .map((m) => ({ role: m.role, content: m.content.slice(0, 4000) }));
 
-  const apiKey = process.env.AI_API_KEY;
-  const apiUrl = process.env.AI_API_URL || 'https://opencode.ai/inference/openai/v1/chat/completions';
-  const model = process.env.AI_MODEL || 'big-pickle';
-  const visionModel = process.env.AI_VISION_MODEL || model;
+  const apiKey = process.env.GEMINI_API_KEY || '';
+  const model = process.env.GEMINI_MODEL || 'gemini-3-flash-preview';
+  const apiUrl = process.env.GEMINI_API_URL || `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
   const lastUser = [...safeMessages].reverse().find((m) => m.role === 'user')?.content || '';
   let liveContext = '';
+
+  if (isPlaceholderKey(apiKey)) {
+    return res.status(200).json(fallbackResponse(lastUser, language, 'AI_NOT_CONFIGURED'));
+  }
+
   const lower = lastUser.toLowerCase();
-  const wantsWeather = /\b(weather|temperature|forecast|rain|humidity|wind|hot|cold|sunny|cloudy|मौसम|तापमान|बारिश|वातावरणం|ఉష్ణోగ్రత|వర్షం)\b/.test(lower);
+  const wantsWeather = /\b(weather|temperature|forecast|rain|humidity|wind|hot|cold|sunny|cloudy|मौसम|तापमान|बारिश|वातावरण|ఉష్ణోగ్రత|వర్షం)\b/.test(lower);
   const wantsNews = /\b(news|headlines|latest|happening|breaking|article|समाचार|खबर|వార్తలు|తాజా)\b/.test(lower);
   if (wantsWeather) {
     const weatherLoc = (typeof locationHint === 'string' && locationHint.trim()) ? locationHint : DEFAULT_WEATHER_LOCATION;
@@ -258,39 +263,32 @@ app.post('/api/chat', async (req, res) => {
   }
 
   try {
-    const hasImage = typeof imageDataUrl === 'string' && imageDataUrl.startsWith('data:image/');
     const system = buildSystemPrompt(language, autoDetect, {
       mode,
       memories: Array.isArray(memories) ? memories.filter((m) => typeof m === 'string').slice(0, 8) : [],
       documentText: typeof documentText === 'string' ? documentText.slice(0, 12000) : '',
-      imageAttached: hasImage,
       location: typeof locationHint === 'string' ? locationHint.slice(0, 120) : '',
     }) + (liveContext ? `\n${liveContext}` : '');
 
-    const chatMessages = [{ role: 'system', content: system }];
-    for (const m of safeMessages.slice(0, -1)) chatMessages.push(m);
-    if (hasImage) {
-      chatMessages.push({
-        role: 'user',
-        content: [
-          { type: 'text', text: lastUser || 'Please analyze this image.' },
-          { type: 'image_url', image_url: { url: imageDataUrl } },
-        ],
+    const geminiContents = [];
+    for (const m of safeMessages.slice(0, -1)) {
+      geminiContents.push({
+        role: m.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: m.content }],
       });
-    } else if (lastUser) {
-      chatMessages.push({ role: 'user', content: lastUser });
     }
+    const userContent = lastUser || 'Please analyze this message.';
+    geminiContents.push({ role: 'user', parts: [{ text: userContent }] });
 
-    const response = await fetch(apiUrl, {
+    const response = await fetch(`${apiUrl}?key=${apiKey}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: hasImage ? visionModel : model,
-        temperature: 0.7,
-        messages: chatMessages,
+        systemInstruction: { parts: [{ text: system }] },
+        contents: geminiContents,
+        generationConfig: { temperature: 0.7 },
       }),
     });
 
@@ -315,7 +313,7 @@ app.post('/api/chat', async (req, res) => {
     }
 
     const data = await response.json();
-    const content = data?.choices?.[0]?.message?.content || '';
+    const content = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
     const parsed = extractJson(content);
 
     if (parsed && typeof parsed.reply === 'string') {
@@ -353,15 +351,24 @@ app.get('*', (req, res, next) => {
   });
 });
 
-const server = app.listen(PORT, () => {
-  console.log(`SWAR AI server running on http://localhost:${PORT}`);
-});
+if (isPlaceholderKey(process.env.GEMINI_API_KEY)) {
+  console.warn('WARNING: GEMINI_API_KEY is still a placeholder (your_gemini_api_key_here). Real AI responses will not work until you set a valid Gemini key in .env.');
+}
 
-server.on('error', (err) => {
-  if (err && err.code === 'EADDRINUSE') {
-    console.error(`Port ${PORT} is already in use. Stop the existing process using that port, or set PORT in .env to a free port.`);
+const isDirectRun = Boolean(process.argv[1]) && path.resolve(process.argv[1]).toLowerCase() === __filename.toLowerCase();
+if (isDirectRun && !process.env.VERCEL) {
+  const server = app.listen(PORT, () => {
+    console.log(`SWAR AI server running on http://localhost:${PORT}`);
+  });
+
+  server.on('error', (err) => {
+    if (err && err.code === 'EADDRINUSE') {
+      console.error(`Port ${PORT} is already in use. Stop the existing process using that port, or set PORT in .env to a free port.`);
+      process.exit(1);
+    }
+    console.error('Server listen error:', err);
     process.exit(1);
-  }
-  console.error('Server listen error:', err);
-  process.exit(1);
-});
+  });
+}
+
+export default app;
