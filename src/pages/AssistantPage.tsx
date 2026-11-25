@@ -77,10 +77,6 @@ export default function AssistantPage() {
 
   useEffect(() => { setContinuous(settings.continuousMode); }, [settings.continuousMode]);
   useEffect(() => {
-    if (!user) {
-      setKeyStatus({ ok: true, configured: false, connectionState: 'Not Configured' });
-      return;
-    }
     fetchApiKeyStatus().then((st) => setKeyStatus(st));
   }, [user?.uid]);
   useEffect(() => { if (settings.saveHistory) try { localStorage.setItem(HISTORY_KEY, JSON.stringify(messages.slice(-50))); } catch {} }, [messages, settings.saveHistory]);
@@ -677,48 +673,42 @@ export default function AssistantPage() {
                           </span>
                         </div>
                         <div className="setting-desc">
-                          {!user
-                            ? <>Please <Link to="/auth" className="link-btn">sign in</Link> to save and activate your personal API key securely.</>
-                            : keyStatus.configured
-                              ? `Active key: ${keyStatus.keySuffix || '••••'} (${keyStatus.provider || 'AI'} • ${keyStatus.model || 'default'})`
-                              : 'Paste a Gemini (AIza...) or OpenCode key and click Set Key to verify & activate.'}
+                          {keyStatus.configured
+                            ? `Active key: ${keyStatus.keySuffix || '••••'} (${keyStatus.provider || 'AI'} • ${keyStatus.model || 'default'})`
+                            : 'Paste a Gemini (AIza...) or OpenCode key and click Set Key to verify & activate.'}
                         </div>
                       </div>
-                      {user && keyStatus.configured && (
+                      {keyStatus.configured && (
                         <button className="btn btn-ghost btn-sm" type="button" disabled={keyBusy} onClick={handleRemoveKey}>
                           Remove Key
                         </button>
                       )}
                     </div>
-                    {user && (
-                      <>
-                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                          <input
-                            className="input"
-                            style={{ flex: 1, minWidth: 180 }}
-                            type={showApiKey ? 'text' : 'password'}
-                            value={apiKeyDraft}
-                            onChange={(e) => { setApiKeyDraft(e.target.value); setKeyFeedback(null); }}
-                            placeholder={keyStatus.configured ? 'Paste new key to replace active key' : 'Paste Gemini (AIza...) or OpenCode API key'}
-                            autoComplete="off"
-                            disabled={keyBusy}
-                          />
-                          <button className="btn btn-secondary btn-icon" type="button" onClick={() => setShowApiKey((v) => !v)} aria-label={showApiKey ? 'Hide API key' : 'Show API key'}>
-                            {showApiKey ? <EyeOff size={16} /> : <Eye size={16} />}
-                          </button>
-                          <button className="btn btn-primary btn-sm" type="button" disabled={keyBusy || !apiKeyDraft.trim()} onClick={handleActivateKey}>
-                            <Check size={15} /> {keyBusy ? 'Verifying...' : 'Set Key'}
-                          </button>
-                          <button className="btn btn-secondary btn-sm" type="button" disabled={keyBusy} onClick={handleTestConnection}>
-                            Test Connection
-                          </button>
-                        </div>
-                        {keyFeedback && (
-                          <div className={`setting-desc`} style={{ color: keyFeedback.type === 'ok' ? '#7ef0b5' : '#ffb3b3', fontWeight: 500 }}>
-                            {keyFeedback.text}
-                          </div>
-                        )}
-                      </>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <input
+                        className="input"
+                        style={{ flex: 1, minWidth: 180 }}
+                        type={showApiKey ? 'text' : 'password'}
+                        value={apiKeyDraft}
+                        onChange={(e) => { setApiKeyDraft(e.target.value); setKeyFeedback(null); }}
+                        placeholder={keyStatus.configured ? 'Paste new key to replace active key' : 'Paste Gemini (AIza...) or OpenCode API key'}
+                        autoComplete="off"
+                        disabled={keyBusy}
+                      />
+                      <button className="btn btn-secondary btn-icon" type="button" onClick={() => setShowApiKey((v) => !v)} aria-label={showApiKey ? 'Hide API key' : 'Show API key'}>
+                        {showApiKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                      <button className="btn btn-primary btn-sm" type="button" disabled={keyBusy || !apiKeyDraft.trim()} onClick={handleActivateKey}>
+                        <Check size={15} /> {keyBusy ? 'Verifying...' : 'Set Key'}
+                      </button>
+                      <button className="btn btn-secondary btn-sm" type="button" disabled={keyBusy} onClick={handleTestConnection}>
+                        Test Connection
+                      </button>
+                    </div>
+                    {keyFeedback && (
+                      <div className="setting-desc" style={{ color: keyFeedback.type === 'ok' ? '#7ef0b5' : '#ffb3b3', fontWeight: 500 }}>
+                        {keyFeedback.text}
+                      </div>
                     )}
                   </div>
                   <button className="btn btn-secondary" onClick={clearHistory}><Trash2 size={16} /> {t('clearHistory')}</button>

@@ -57,11 +57,20 @@ test('Express /api/health and /api/chat validation & safe error responses', asyn
     });
     assert.equal(emptyMsgRes.status, 400);
 
-    // Key management endpoints must reject unauthenticated requests with 401
-    for (const [method, path] of [['GET', '/api/key'], ['POST', '/api/key/activate'], ['POST', '/api/key/test'], ['DELETE', '/api/key']]) {
-      const r = await fetch(`${baseUrl}${path}`, { method, headers: { 'Content-Type': 'application/json' }, body: method === 'POST' ? '{}' : undefined });
-      assert.equal(r.status, 401, `${method} ${path} should require auth`);
-    }
+    // Key management endpoints: unconfigured returns Not Configured, empty activate returns 400
+    const statusRes = await fetch(`${baseUrl}/api/key`);
+    assert.equal(statusRes.status, 200);
+    const statusJson = await statusRes.json();
+    assert.equal(statusJson.configured, false);
+    assert.equal(statusJson.connectionState, 'Not Configured');
+
+    const emptyActivate = await fetch(`${baseUrl}/api/key/activate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ apiKey: '   ' }),
+    });
+    assert.equal(emptyActivate.status, 400);
+    assert.ok(emptyActivate.headers.get('set-cookie')?.includes('swar_sid='));
 
     // Upload extraction validation
     const badExtractRes = await fetch(`${baseUrl}/api/extract`, {

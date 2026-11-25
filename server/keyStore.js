@@ -109,6 +109,40 @@ export async function verifySupabaseAuth(req) {
   }
 }
 
+function parseCookies(cookieHeader) {
+  const out = {};
+  for (const part of String(cookieHeader || '').split(';')) {
+    const idx = part.indexOf('=');
+    if (idx > 0) {
+      out[part.slice(0, idx).trim()] = decodeURIComponent(part.slice(idx + 1).trim());
+    }
+  }
+  return out;
+}
+
+export async function resolveKeyOwner(req, res, { createGuest = false } = {}) {
+  const auth = await verifySupabaseAuth(req);
+  if (auth) return { ...auth, isGuest: false };
+
+  const cookies = parseCookies(req.headers.cookie);
+  let sid = cookies.swar_sid;
+  if (!sid && createGuest && res) {
+    sid = crypto.randomUUID();
+    const isProd = process.env.NODE_ENV === 'production' || Boolean(process.env.VERCEL);
+    const cookieParts = [
+      `swar_sid=${encodeURIComponent(sid)}`,
+      'Path=/',
+      'HttpOnly',
+      'SameSite=Lax',
+      'Max-Age=2592000',
+      ...(isProd ? ['Secure'] : []),
+    ];
+    res.setHeader('Set-Cookie', cookieParts.join('; '));
+  }
+  if (!sid) return null;
+  return { userId: `guest:${sid}`, token: null, isGuest: true };
+}
+
 export function resolveProviderConfig(apiKey) {
   const trimmed = String(apiKey || '').trim();
   const isGeminiKey = trimmed.startsWith('AIza');

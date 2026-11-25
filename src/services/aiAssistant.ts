@@ -70,6 +70,7 @@ export async function sendChatMessage({ messages, language, autoDetect, mode = '
     res = await fetch('/api/chat', {
       method: 'POST',
       headers,
+      credentials: 'include',
       body: JSON.stringify(payload),
       signal: controller.signal,
     });
@@ -120,7 +121,7 @@ async function postJson<T>(url: string, body: unknown, timeoutMs = 15000): Promi
 export async function fetchApiKeyStatus(): Promise<ApiKeyStatus> {
   try {
     const headers = await getAuthHeaders();
-    const res = await fetch('/api/key', { method: 'GET', headers });
+    const res = await fetch('/api/key', { method: 'GET', headers, credentials: 'include' });
     const data = await res.json().catch(() => ({}));
     return {
       ok: res.ok && Boolean(data?.ok ?? true),
@@ -144,6 +145,7 @@ export async function activateApiKey(apiKey: string): Promise<ApiKeyStatus> {
     const res = await fetch('/api/key/activate', {
       method: 'POST',
       headers,
+      credentials: 'include',
       body: JSON.stringify({ apiKey: apiKey.trim() }),
     });
     const data = await res.json().catch(() => ({}));
@@ -166,7 +168,7 @@ export async function activateApiKey(apiKey: string): Promise<ApiKeyStatus> {
 export async function testApiKeyConnection(): Promise<ApiKeyStatus> {
   try {
     const headers = await getAuthHeaders();
-    const res = await fetch('/api/key/test', { method: 'POST', headers });
+    const res = await fetch('/api/key/test', { method: 'POST', headers, credentials: 'include' });
     const data = await res.json().catch(() => ({}));
     return {
       ok: res.ok && Boolean(data?.ok),
@@ -186,7 +188,7 @@ export async function testApiKeyConnection(): Promise<ApiKeyStatus> {
 export async function removeApiKey(): Promise<ApiKeyStatus> {
   try {
     const headers = await getAuthHeaders();
-    const res = await fetch('/api/key', { method: 'DELETE', headers });
+    const res = await fetch('/api/key', { method: 'DELETE', headers, credentials: 'include' });
     const data = await res.json().catch(() => ({}));
     return {
       ok: res.ok && Boolean(data?.ok),

@@ -6,7 +6,7 @@ import { fileURLToPath } from 'url';
 import mammoth from 'mammoth';
 import { extractText as extractPdfText } from 'unpdf';
 import {
-  verifySupabaseAuth,
+  resolveKeyOwner,
   verifyProviderKey,
   getUserKeyRecord,
   saveUserKeyRecord,
@@ -189,11 +189,11 @@ app.get('/api/health', (_req, res) => {
 });
 
 app.get('/api/key', async (req, res) => {
-  const auth = await verifySupabaseAuth(req);
-  if (!auth) {
-    return res.status(401).json({ ok: false, error: 'UNAUTHORIZED', message: 'Please sign in to manage your API key.' });
+  const owner = await resolveKeyOwner(req, res, { createGuest: false });
+  if (!owner) {
+    return res.json({ ok: true, configured: false, connectionState: 'Not Configured' });
   }
-  const record = await getUserKeyRecord(auth);
+  const record = await getUserKeyRecord(owner);
   if (!record) {
     return res.json({ ok: true, configured: false, connectionState: 'Not Configured' });
   }
@@ -209,10 +209,7 @@ app.get('/api/key', async (req, res) => {
 });
 
 app.post('/api/key/activate', async (req, res) => {
-  const auth = await verifySupabaseAuth(req);
-  if (!auth) {
-    return res.status(401).json({ ok: false, connectionState: 'Connection Failed', error: 'UNAUTHORIZED', message: 'Please sign in before activating an API key.' });
-  }
+  const owner = await resolveKeyOwner(req, res, { createGuest: true });
   const rawKey = typeof req.body?.apiKey === 'string' ? req.body.apiKey.trim() : '';
   if (!rawKey) {
     return res.status(400).json({ ok: false, connectionState: 'Invalid API Key', error: 'EMPTY_KEY', message: 'API key cannot be empty.' });
@@ -231,7 +228,7 @@ app.post('/api/key/activate', async (req, res) => {
     });
   }
 
-  const saved = await saveUserKeyRecord(auth, rawKey, verification);
+  const saved = await saveUserKeyRecord(owner, rawKey, verification);
   return res.json({
     ok: true,
     ...saved,
@@ -240,11 +237,8 @@ app.post('/api/key/activate', async (req, res) => {
 });
 
 app.post('/api/key/test', async (req, res) => {
-  const auth = await verifySupabaseAuth(req);
-  if (!auth) {
-    return res.status(401).json({ ok: false, connectionState: 'Connection Failed', error: 'UNAUTHORIZED', message: 'Please sign in to test your API key.' });
-  }
-  const record = await getUserKeyRecord(auth);
+  const owner = await resolveKeyOwner(req, res, { createGuest: false });
+  const record = owner ? await getUserKeyRecord(owner) : null;
   if (!record) {
     const serverKey = !isPlaceholderKey(process.env.AI_API_KEY) ? String(process.env.AI_API_KEY).trim() : '';
     if (!serverKey) {
@@ -280,11 +274,10 @@ app.post('/api/key/test', async (req, res) => {
 });
 
 app.delete('/api/key', async (req, res) => {
-  const auth = await verifySupabaseAuth(req);
-  if (!auth) {
-    return res.status(401).json({ ok: false, error: 'UNAUTHORIZED', message: 'Please sign in to remove your API key.' });
+  const owner = await resolveKeyOwner(req, res, { createGuest: false });
+  if (owner) {
+    await deleteUserKeyRecord(owner);
   }
-  await deleteUserKeyRecord(auth);
   return res.json({ ok: true, configured: false, connectionState: 'Not Configured', message: 'API key removed.' });
 });
 
@@ -460,10 +453,10 @@ app.post('/api/chat', async (req, res) => {
   const detectedFromText = detectLanguageFromText(lastUser);
   const responseLanguage = autoDetect ? detectedFromText : language;
 
-  const auth = await verifySupabaseAuth(req);
+  const owner = await resolveKeyOwner(req, res, { createGuest: false });
   let apiKey = '';
-  if (auth) {
-    const userRecord = await getUserKeyRecord(auth);
+  if (owner) {
+    const userRecord = await getUserKeyRecord(owner);
     if (userRecord) {
       apiKey = decryptApiKey(userRecord);
     }
