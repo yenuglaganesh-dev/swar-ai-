@@ -336,13 +336,48 @@ app.post('/api/chat', async (req, res) => {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 40000);
     let response;
+    let rawContent = '';
     try {
-      response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify({ model: hasImage ? visionModel : model, temperature: 0.7, messages: chatMessages }),
-        signal: controller.signal,
-      });
+      if (isGeminiKey) {
+        const geminiContents = safeMessages.slice(0, -1).map((m) => ({
+          role: m.role === 'assistant' ? 'model' : 'user',
+          parts: [{ text: m.content }],
+        }));
+        const lastParts = [{ text: lastUser }];
+        if (hasImage) {
+          const match = imageDataUrl.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+          if (match) {
+            lastParts.push({ inlineData: { mimeType: match[1], data: match[2] } });
+          }
+        }
+        geminiContents.push({ role: 'user', parts: lastParts });
+
+        const callGemini = (targetModel) => fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(targetModel)}:generateContent?key=${encodeURIComponent(apiKey)}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              systemInstruction: { parts: [{ text: system }] },
+              contents: geminiContents,
+              generationConfig: { temperature: 0.7, responseMimeType: 'application/json' },
+            }),
+            signal: controller.signal,
+          },
+        );
+
+        response = await callGemini(model);
+        if (response.status === 404 && model !== 'gemini-2.0-flash') {
+          response = await callGemini('gemini-2.0-flash');
+        }
+      } else {
+        response = await fetch(apiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+          body: JSON.stringify({ model: hasImage ? visionModel : model, temperature: 0.7, messages: chatMessages }),
+          signal: controller.signal,
+        });
+      }
     } finally {
       clearTimeout(timeout);
     }
@@ -352,7 +387,7 @@ app.post('/api/chat', async (req, res) => {
       let providerError = {};
       try { providerError = JSON.parse(errText)?.error || {}; } catch { /* ignore */ }
       const safeProviderMessage = typeof providerError.message === 'string' ? providerError.message.slice(0, 300) : `Upstream status ${response.status}`;
-      const safeCode = typeof providerError.code === 'string' ? providerError.code : (typeof providerError.type === 'string' ? providerError.type : undefined);
+      const safeCode = typeof providerError.code === 'string' ? providerError.code : (typeof providerError.type === 'string' ? providerError.type : (typeof providerError.status === 'string' ? providerError.status : undefined));
       const reason = response.status === 401 || response.status === 403 ? 'AI_AUTH_ERROR'
         : response.status === 429 ? 'AI_RATE_LIMITED'
           : response.status === 404 ? 'AI_MODEL_OR_ENDPOINT_ERROR'
@@ -367,7 +402,9 @@ app.post('/api/chat', async (req, res) => {
     }
 
     const data = await response.json();
-    const rawContent = data?.choices?.[0]?.message?.content ?? data?.output_text ?? data?.reply ?? '';
+    rawContent = isGeminiKey
+      ? (data?.candidates?.[0]?.content?.parts?.map((p) => p?.text || '').join('\n') ?? '')
+      : (data?.choices?.[0]?.message?.content ?? data?.output_text ?? data?.reply ?? '');
     const content = Array.isArray(rawContent)
       ? rawContent.map((part) => typeof part === 'string' ? part : (part?.text || '')).join('\\n').trim()
       : typeof rawContent === 'string' ? rawContent.trim() : '';
