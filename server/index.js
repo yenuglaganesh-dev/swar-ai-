@@ -51,24 +51,25 @@ const LANG_NAMES = {
 
 function buildSystemPrompt(language, autoDetect, context = {}) {
   const langName = LANG_NAMES[language] || 'English';
-  const { mode, memories = [], documentText = '', imageAttached = false, location = '' } = context;
+  const { mode, memories = [], documentText = '', imageAttached = false, location = '', thinkHarder = false } = context;
   const modeHint = mode === 'tutor' ? 'Act as a patient educational tutor. Explain concepts step by step, check understanding, and give simple examples.'
     : mode === 'simple' ? 'Explain in very simple words, short sentences, and small steps. Avoid jargon.'
-    : mode === 'translate' ? 'Focus on accurate translation between Telugu, Hindi, and English. Provide the translation clearly and briefly explain meaning if helpful.'
-    : mode === 'emergency' ? 'Provide verified general emergency guidance only. For emergencies, clearly advise contacting local emergency services immediately. Do not guess medical/legal instructions. Share only widely accepted safety guidance.'
-    : 'Be a helpful general assistant.';
+      : mode === 'translate' ? 'Focus on accurate translation between Telugu, Hindi, and English. Provide the translation clearly and briefly explain meaning if helpful.'
+        : mode === 'emergency' ? 'Provide verified general emergency guidance only. For emergencies, clearly advise contacting local emergency services immediately. Do not guess medical/legal instructions. Share only widely accepted safety guidance.'
+          : 'Be a helpful general assistant.';
   return [
     'You are SWAR AI, a friendly, natural-sounding female AI voice assistant.',
     'Your mission is to make AI accessible to everyone, including people who cannot comfortably read, write, or type.',
     'Supported languages: Telugu (te-IN), Hindi (hi-IN), English (en-IN).',
     autoDetect
       ? `Detect the language of the latest user message. If it is Telugu, answer in natural Telugu script; if Hindi, answer in natural Devanagari Hindi; if English, answer in English. For mixed Telugu-English or Hindi-English, mirror the user's mix naturally. If unclear, use ${langName}. The latest message language takes priority over earlier conversation turns.`
-      : `Use ${langName} (${language}) for the entire answer. Telugu must be written in Telugu script, Hindi in Devanagari, and English in Latin script. If the user explicitly requests another of these three languages, follow that request. The latest message language/request takes priority.`
+      : `Use ${langName} (${language}) for the entire answer. Telugu must be written in Telugu script, Hindi in Devanagari, and English in Latin script. If the user explicitly requests another of these three languages, follow that request. The latest message language/request takes priority.`,
     modeHint,
     memories.length ? `User memory (only use if relevant, user consented): ${memories.slice(0, 8).map((m) => `- ${m}`).join(' ')}` : 'No personal memory is available.',
     documentText ? `Document context provided by user (use it to answer/explain):\n${documentText.slice(0, 12000)}` : '',
     imageAttached ? 'The user attached an image. If image content is provided, describe/answer based on it; if not, ask them to describe it.' : '',
     location ? `User location hint: ${location}` : '',
+    thinkHarder ? 'DEEP REASONING MODE (Think Harder) is enabled: Carefully analyze the problem step by step, verify edge cases and assumptions, and provide a thorough, well-structured, accurate answer.' : '',
     'Keep answers clear, simple, warm, and respectful. Avoid unnecessarily complicated vocabulary.',
     'You can help with general questions, education, everyday assistance, technology, language translation/explanation, recommendations, and step-by-step guidance.',
     'For weather/news: only use provided external data from tools/context. If no live data is provided, say you need live weather/news API configuration and offer general help.',
@@ -260,6 +261,7 @@ app.post('/api/chat', async (req, res) => {
   const documentText = typeof body.documentText === 'string' ? body.documentText : '';
   const imageDataUrl = typeof body.imageDataUrl === 'string' ? body.imageDataUrl : '';
   const locationHint = typeof body.locationHint === 'string' ? body.locationHint : '';
+  const thinkHarder = body.thinkHarder === true;
 
   if (!Array.isArray(messages)) {
     return res.status(400).json({ error: 'messages must be an array' });
@@ -278,10 +280,16 @@ app.post('/api/chat', async (req, res) => {
   const detectedFromText = /[\\u0C00-\\u0C7F]/u.test(lastUser) ? 'te-IN'
     : /[\\u0900-\\u097F]/u.test(lastUser) ? 'hi-IN' : 'en-IN';
   const responseLanguage = autoDetect ? detectedFromText : language;
-  const apiKey = process.env.AI_API_KEY;
-  const apiUrl = process.env.AI_API_URL || 'https://opencode.ai/inference/openai/v1/chat/completions';
-  const model = process.env.AI_MODEL || 'big-pickle';
-  const visionModel = process.env.AI_VISION_MODEL || model;
+  const customApiKey = typeof body.customApiKey === 'string' ? body.customApiKey.trim() : '';
+  const apiKey = customApiKey || process.env.AI_API_KEY;
+  const isGeminiKey = Boolean(apiKey && apiKey.startsWith('AIza'));
+  const apiUrl = isGeminiKey
+    ? 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions'
+    : (process.env.AI_API_URL || 'https://opencode.ai/inference/openai/v1/chat/completions');
+  const model = isGeminiKey
+    ? (process.env.GEMINI_MODEL || 'gemini-2.5-flash')
+    : (process.env.AI_MODEL || 'big-pickle');
+  const visionModel = isGeminiKey ? model : (process.env.AI_VISION_MODEL || model);
 
   let liveContext = '';
   const lower = lastUser.toLowerCase();
@@ -310,14 +318,17 @@ app.post('/api/chat', async (req, res) => {
       documentText: documentText.slice(0, 12000),
       imageAttached: hasImage,
       location: locationHint.slice(0, 120),
+      thinkHarder,
     }) + (liveContext ? `\\n${liveContext}` : '');
 
     const chatMessages = [{ role: 'system', content: system }, ...safeMessages.slice(0, -1)];
     if (hasImage) {
-      chatMessages.push({ role: 'user', content: [
-        { type: 'text', text: lastUser },
-        { type: 'image_url', image_url: { url: imageDataUrl } },
-      ] });
+      chatMessages.push({
+        role: 'user', content: [
+          { type: 'text', text: lastUser },
+          { type: 'image_url', image_url: { url: imageDataUrl } },
+        ]
+      });
     } else {
       chatMessages.push({ role: 'user', content: lastUser });
     }
@@ -344,8 +355,8 @@ app.post('/api/chat', async (req, res) => {
       const safeCode = typeof providerError.code === 'string' ? providerError.code : (typeof providerError.type === 'string' ? providerError.type : undefined);
       const reason = response.status === 401 || response.status === 403 ? 'AI_AUTH_ERROR'
         : response.status === 429 ? 'AI_RATE_LIMITED'
-        : response.status === 404 ? 'AI_MODEL_OR_ENDPOINT_ERROR'
-        : response.status === 400 ? 'AI_BAD_REQUEST' : 'AI_UPSTREAM_ERROR';
+          : response.status === 404 ? 'AI_MODEL_OR_ENDPOINT_ERROR'
+            : response.status === 400 ? 'AI_BAD_REQUEST' : 'AI_UPSTREAM_ERROR';
       console.error('AI API error', { status: response.status, code: safeCode, message: safeProviderMessage });
       return res.status(502).json({
         ...fallbackResponse('', responseLanguage, reason),

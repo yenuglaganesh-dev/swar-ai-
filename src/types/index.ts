@@ -38,6 +38,7 @@ export interface UserSettings {
   continuousMode: boolean;
   memoryConsent: boolean;
   saveAudio: boolean;
+  customApiKey: string;
 }
 
 export const DEFAULT_SETTINGS: UserSettings = {
@@ -50,4 +51,5 @@ export const DEFAULT_SETTINGS: UserSettings = {
   continuousMode: false,
   memoryConsent: false,
   saveAudio: false,
+  customApiKey: '',
 };

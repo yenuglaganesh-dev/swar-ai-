@@ -18,6 +18,7 @@ function normalizeSettings(parsed: any): UserSettings {
       ? parsed.preferredLanguage
       : DEFAULT_SETTINGS.preferredLanguage,
     speechRate: typeof parsed?.speechRate === 'number' ? Math.min(1.5, Math.max(0.7, parsed.speechRate)) : DEFAULT_SETTINGS.speechRate,
+    customApiKey: typeof parsed?.customApiKey === 'string' ? parsed.customApiKey.trim() : '',
   };
 }
 

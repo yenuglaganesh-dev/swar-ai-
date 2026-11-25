@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Send, Settings, Trash2, Volume2, RotateCcw, User, Home, AlertTriangle, MicOff, Camera, FileUp, X, LayoutDashboard, ShieldAlert, CloudSun, Newspaper, Brain, GraduationCap, Languages } from 'lucide-react';
+import { Send, Settings, Trash2, Volume2, RotateCcw, User, Home, AlertTriangle, MicOff, Camera, FileUp, X, LayoutDashboard, ShieldAlert, CloudSun, Newspaper, Brain, GraduationCap, Languages, KeyRound, Eye, EyeOff, Plus, Image, FileText, Puzzle, Sparkles, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import PageShell from '@/components/Layout/PageShell';
 import LanguageSelector from '@/components/Layout/LanguageSelector';
@@ -33,6 +33,10 @@ export default function AssistantPage() {
   const [input, setInput] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [attachMenuOpen, setAttachMenuOpen] = useState(false);
+  const [pluginsOpen, setPluginsOpen] = useState(false);
+  const [thinkHarder, setThinkHarder] = useState(false);
   const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
   const [mode, setMode] = useState<'default' | 'tutor' | 'simple' | 'translate' | 'emergency'>('default');
   const [continuous, setContinuous] = useState(settings.continuousMode);
@@ -49,6 +53,11 @@ export default function AssistantPage() {
   const [locationHint, setLocationHint] = useState(safeStorage.getItem('swar_location') || 'Hyderabad');
 
   const recognitionRef = useRef<ReturnType<typeof createRecognition> | null>(null);
+  const latestTranscriptRef = useRef('');
+  const voiceSubmittedRef = useRef(false);
+  const attachMenuRef = useRef<HTMLDivElement | null>(null);
+  const photoInputRef = useRef<HTMLInputElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -174,6 +183,8 @@ export default function AssistantPage() {
       const res = await sendChatMessage({
         messages: nextMessages, language: userLang, autoDetect: settings.autoDetectLanguage,
         mode: activeMode, memories: settings.memoryConsent ? memories : [], documentText: docText, imageDataUrl, locationHint,
+        customApiKey: settings.customApiKey,
+        thinkHarder,
       });
       const replyLang = (res.detectedLanguage || userLang) as LanguageCode;
       if (settings.autoDetectLanguage && replyLang !== language) { setLanguage(replyLang); updateSettings({ preferredLanguage: replyLang }); }
@@ -204,25 +215,87 @@ export default function AssistantPage() {
       setStatus('error'); setError(`${t('aiError')} (${msg})`);
       setMessages((prev) => [...prev, { id: uid(), role: 'assistant', content: t('aiError'), language, timestamp: Date.now(), error: true, suggestions: [t('retry')] }]);
     }
-  }, [mode, settings, language, memories, docText, imageDataUrl, locationHint, user, ensureConversation, setLanguage, updateSettings, speak, cleanupAudio, t]);
+  }, [mode, settings, language, memories, docText, imageDataUrl, locationHint, thinkHarder, user, ensureConversation, setLanguage, updateSettings, speak, cleanupAudio, t]);
+
+  useEffect(() => {
+    if (!attachMenuOpen) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (attachMenuRef.current && !attachMenuRef.current.contains(e.target as Node)) {
+        setAttachMenuOpen(false);
+      }
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setAttachMenuOpen(false);
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [attachMenuOpen]);
 
   const startListening = useCallback(async () => {
     setError(null); stopSpeaking();
     if (!speechRecSupported) { setError(t('micNotSupported')); return; }
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-      const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      const ctx = new Ctx(); audioCtxRef.current = ctx;
-      const source = ctx.createMediaStreamSource(stream); const an = ctx.createAnalyser(); an.fftSize = 256; source.connect(an); setAnalyser(an);
-    } catch { setError(t('micPermissionDenied')); setStatus('error'); return; }
+
+    recognitionRef.current?.abort();
+    cleanupAudio();
+    latestTranscriptRef.current = '';
+    voiceSubmittedRef.current = false;
+
     const rec = createRecognition(language, {
       onStart: () => setStatus('listening'),
-      onEnd: () => { cleanupAudio(); if (statusRef.current === 'listening') setStatus('idle'); },
-      onResult: (transcript, isFinal) => { setInput(transcript); if (isFinal && transcript.trim()) { recognitionRef.current?.stop(); cleanupAudio(); handleSend(transcript); } },
-      onError: (err) => { cleanupAudio(); if (err === 'not-allowed' || err === 'service-not-allowed') setError(t('micPermissionDenied')); else if (err !== 'aborted' && err !== 'no-speech') setError(t('error')); setStatus('idle'); },
+      onEnd: () => {
+        cleanupAudio();
+        const pending = latestTranscriptRef.current.trim();
+        if (!voiceSubmittedRef.current && pending) {
+          voiceSubmittedRef.current = true;
+          handleSend(pending);
+          return;
+        }
+        if (statusRef.current === 'listening') setStatus('idle');
+      },
+      onResult: (transcript, isFinal) => {
+        latestTranscriptRef.current = transcript;
+        setInput(transcript);
+        if (isFinal && transcript.trim() && !voiceSubmittedRef.current) {
+          voiceSubmittedRef.current = true;
+          recognitionRef.current?.stop();
+          cleanupAudio();
+          handleSend(transcript);
+        }
+      },
+      onError: (err) => {
+        cleanupAudio();
+        if (err === 'not-allowed' || err === 'service-not-allowed') setError(t('micPermissionDenied'));
+        else if (err === 'no-speech') setError('No speech detected. Please speak into your microphone and try again.');
+        else if (err === 'audio-capture') setError('No microphone found or microphone is busy in another app.');
+        else if (err === 'network') setError('Speech recognition network error. Please check your internet connection.');
+        else if (err !== 'aborted') setError(`${t('error')} (${err})`);
+        setStatus('idle');
+      },
     });
-    recognitionRef.current = rec; rec?.start(); await logUsage(user?.uid || null, 'voice_start');
+    if (!rec) { setError(t('micNotSupported')); return; }
+    recognitionRef.current = rec;
+    rec.start();
+
+    // Optional audio visualizer — never block SpeechRecognition if getUserMedia fails
+    try {
+      if (navigator.mediaDevices?.getUserMedia) {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        streamRef.current = stream;
+        const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        if (Ctx) {
+          const ctx = new Ctx(); audioCtxRef.current = ctx;
+          if (ctx.state === 'suspended') await ctx.resume().catch(() => {});
+          const source = ctx.createMediaStreamSource(stream); const an = ctx.createAnalyser(); an.fftSize = 256; source.connect(an); setAnalyser(an);
+        }
+      }
+    } catch {
+      /* Visualizer is optional; SpeechRecognition handles mic input independently */
+    }
+    await logUsage(user?.uid || null, 'voice_start').catch(() => {});
   }, [language, speechRecSupported, handleSend, cleanupAudio, t, user]);
   const startListeningRef = useRef(startListening); startListeningRef.current = startListening;
 
@@ -242,9 +315,27 @@ export default function AssistantPage() {
     if (name.match(/\.(txt|md|csv|json|js|ts|tsx|py|html|css)$/)) {
       const text = await file.text();
       setDocText(text.slice(0, 12000)); setDocName(file.name);
+    } else if (name.match(/\.(pdf|doc|docx)$/)) {
+      setDocText(`[Attached document: ${file.name} (${Math.max(1, Math.round(file.size / 1024))} KB). Note: binary PDF/DOCX text extraction is limited in browser; ask the user to paste key text if needed.]`);
+      setDocName(file.name);
     } else {
-      setError('Document text extraction is supported for text files (.txt, .md, .csv, .json, code). For PDF/images, use camera/image or paste text.');
+      setError('Supported files: .pdf, .doc, .docx, .txt, .md, .csv, .json, and code files.');
     }
+  };
+
+  const handlePhotoUpload = (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      setError('Please select a valid image file.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setImageDataUrl(reader.result);
+        setError(null);
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   const openCamera = async () => {
@@ -367,7 +458,14 @@ export default function AssistantPage() {
 
           <section className="assistant-chat glass">
             <ConversationPanel messages={messages} onSuggestion={(s) => handleSend(s)} onRepeat={(text) => onRepeat(text)} onSimplify={onSimplify} />
-            {error && <div className="chat-error" role="alert"><AlertTriangle size={16} /> {error}</div>}
+            {error && (
+              <div className="chat-error" role="alert" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><AlertTriangle size={16} /> {error}</span>
+                {(error.includes('API') || error.includes('rate limit') || error.includes('quota') || error.includes('authentication')) && (
+                  <button className="btn btn-sm btn-secondary" onClick={() => setShowSettings(true)}><KeyRound size={14} /> Change API Key</button>
+                )}
+              </div>
+            )}
             {memoryCandidate && settings.memoryConsent && (
               <div className="chat-error" style={{ background: 'rgba(255,107,53,0.1)', color: '#ffd2c2' }}>
                 <Brain size={16} /> {t('memoryConsentAsk')} "{memoryCandidate}"
@@ -377,14 +475,101 @@ export default function AssistantPage() {
             )}
             <div className="chat-controls">
               <div className="tool-row">
-                <label className="btn btn-secondary btn-sm"><FileUp size={16} />{t('uploadDocument')}<input type="file" hidden accept=".txt,.md,.csv,.json,.js,.ts,.tsx,.py,.html,.css" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleDocUpload(f); e.currentTarget.value = ''; }} /></label>
-                <button className="btn btn-secondary btn-sm" onClick={openCamera}><Camera size={16} />{t('camera')}</button>
                 <button className="btn btn-secondary btn-sm" onClick={() => doWeather(true)} disabled={weatherLoading}><CloudSun size={16} />{weatherLoading ? t('loading') : t('weather')}</button>
                 <button className="btn btn-secondary btn-sm" onClick={() => doNews(undefined, true)} disabled={newsLoading}><Newspaper size={16} />{newsLoading ? t('loading') : t('news')}</button>
                 <button className="btn btn-secondary btn-sm" onClick={() => { stopSpeaking(); setStatus('idle'); }}><MicOff size={16} />{t('stopSpeaking')}</button>
+                {thinkHarder && (
+                  <button className="btn btn-secondary btn-sm think-badge" onClick={() => setThinkHarder(false)} title="Disable Think Harder">
+                    <Sparkles size={14} /> Think Harder ON <X size={13} />
+                  </button>
+                )}
               </div>
               <MicrophoneButton status={status} onClick={onMicClick} disabled={status === 'processing'} />
-              <div className="input-row">
+              <div className="input-row" ref={attachMenuRef}>
+                <AnimatePresence>
+                  {attachMenuOpen && (
+                    <motion.div
+                      className="attach-popup"
+                      role="menu"
+                      aria-label="Attachment and tools menu"
+                      initial={{ opacity: 0, y: 10, scale: 0.96 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                      transition={{ duration: 0.16, ease: 'easeOut' }}
+                    >
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="attach-item"
+                        onClick={() => { setAttachMenuOpen(false); openCamera(); }}
+                      >
+                        <span className="attach-icon"><Camera size={18} /></span>
+                        <span className="attach-text">Camera</span>
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="attach-item"
+                        onClick={() => { setAttachMenuOpen(false); photoInputRef.current?.click(); }}
+                      >
+                        <span className="attach-icon"><Image size={18} /></span>
+                        <span className="attach-text">Photos</span>
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="attach-item"
+                        onClick={() => { setAttachMenuOpen(false); fileInputRef.current?.click(); }}
+                      >
+                        <span className="attach-icon"><FileText size={18} /></span>
+                        <span className="attach-text">Files</span>
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="attach-item"
+                        onClick={() => { setAttachMenuOpen(false); setPluginsOpen(true); }}
+                      >
+                        <span className="attach-icon"><Puzzle size={18} /></span>
+                        <span className="attach-text">Plugins</span>
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className={`attach-item ${thinkHarder ? 'active' : ''}`}
+                        onClick={() => { setThinkHarder((v) => !v); setAttachMenuOpen(false); }}
+                      >
+                        <span className="attach-icon"><Sparkles size={18} /></span>
+                        <span className="attach-text">Think Harder</span>
+                        {thinkHarder && <Check size={16} className="attach-check" />}
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+                <input
+                  ref={photoInputRef}
+                  type="file"
+                  hidden
+                  accept="image/*"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePhotoUpload(f); e.currentTarget.value = ''; }}
+                />
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  hidden
+                  accept=".pdf,.doc,.docx,.txt,.md,.csv,.json,.js,.ts,.tsx,.py,.html,.css"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handleDocUpload(f); e.currentTarget.value = ''; }}
+                />
+                <button
+                  type="button"
+                  className={`btn btn-secondary btn-icon attach-plus-btn ${attachMenuOpen || thinkHarder ? 'active-toggle' : ''}`}
+                  onClick={() => setAttachMenuOpen((v) => !v)}
+                  aria-label="Open attachment menu"
+                  aria-expanded={attachMenuOpen}
+                  title="Attach or tools"
+                >
+                  <Plus size={20} style={{ transform: attachMenuOpen ? 'rotate(45deg)' : 'none', transition: 'transform 0.16s ease' }} />
+                </button>
                 <button className="btn btn-secondary btn-icon" onClick={() => onRepeat()} aria-label={t('speakAgain')} title={t('speakAgain')}><Volume2 size={18} /></button>
                 <input className="input chat-input" value={input} onChange={(e) => setInput(e.target.value)} placeholder={t('typeMessage')} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(input); } }} aria-label={t('typeMessage')} />
                 <button className="btn btn-primary btn-icon" onClick={() => handleSend(input)} disabled={!input.trim() || status === 'processing'} aria-label={t('send')}><Send size={18} /></button>
@@ -412,7 +597,74 @@ export default function AssistantPage() {
                   ))}
                   <div className="setting-row"><div><div className="setting-label">{t('speechRate')}</div><div className="setting-desc">{settings.speechRate.toFixed(1)}x</div></div><input type="range" min="0.7" max="1.5" step="0.1" value={settings.speechRate} onChange={(e) => updateSettings({ speechRate: Number(e.target.value) })} /></div>
                   <div className="setting-row"><div><div className="setting-label">{t('location')}</div></div><input className="input" style={{ maxWidth: 220 }} value={locationHint} onChange={(e) => { setLocationHint(e.target.value); safeStorage.setItem('swar_location', e.target.value); }} /></div>
+                  <div className="setting-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 10 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                      <div>
+                        <div className="setting-label" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><KeyRound size={15} /> Custom AI API Key</div>
+                        <div className="setting-desc">{settings.customApiKey ? 'Using your custom API key (saved in browser)' : 'Using server default key. Paste a Gemini (AIza...) or OpenCode key if credits run out.'}</div>
+                      </div>
+                      {settings.customApiKey && (
+                        <button className="btn btn-ghost btn-sm" onClick={() => updateSettings({ customApiKey: '' })}>Clear</button>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <input
+                        className="input"
+                        type={showApiKey ? 'text' : 'password'}
+                        value={settings.customApiKey}
+                        onChange={(e) => updateSettings({ customApiKey: e.target.value })}
+                        placeholder="Paste Gemini (AIza...) or OpenCode API key"
+                        autoComplete="off"
+                      />
+                      <button className="btn btn-secondary btn-icon" type="button" onClick={() => setShowApiKey((v) => !v)} aria-label={showApiKey ? 'Hide API key' : 'Show API key'}>
+                        {showApiKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                  </div>
                   <button className="btn btn-secondary" onClick={clearHistory}><Trash2 size={16} /> {t('clearHistory')}</button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {pluginsOpen && (
+            <motion.div className="settings-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setPluginsOpen(false)}>
+              <motion.div className="settings-panel glass" initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} onClick={(e) => e.stopPropagation()}>
+                <div className="settings-head">
+                  <h2 style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}><Puzzle size={20} /> Plugins & Integrations</h2>
+                  <button className="btn btn-ghost" onClick={() => setPluginsOpen(false)}>{t('close')}</button>
+                </div>
+                <div className="settings-body">
+                  <div className="setting-row">
+                    <div>
+                      <div className="setting-label">Live Weather (OpenWeatherMap)</div>
+                      <div className="setting-desc">Fetch current weather for {locationHint || 'Hyderabad'}</div>
+                    </div>
+                    <button className="btn btn-secondary btn-sm" onClick={() => { setPluginsOpen(false); doWeather(true); }}><CloudSun size={15} /> Run</button>
+                  </div>
+                  <div className="setting-row">
+                    <div>
+                      <div className="setting-label">Live News (NewsAPI)</div>
+                      <div className="setting-desc">Get latest headlines for {locationHint || 'technology'}</div>
+                    </div>
+                    <button className="btn btn-secondary btn-sm" onClick={() => { setPluginsOpen(false); doNews(undefined, true); }}><Newspaper size={15} /> Run</button>
+                  </div>
+                  <div className="setting-row">
+                    <div>
+                      <div className="setting-label">Think Harder (Deep Reasoning)</div>
+                      <div className="setting-desc">Step-by-step analysis for complex questions</div>
+                    </div>
+                    <button className={`toggle ${thinkHarder ? 'on' : ''}`} onClick={() => setThinkHarder((v) => !v)} aria-pressed={thinkHarder}><span /></button>
+                  </div>
+                  <div className="setting-row">
+                    <div>
+                      <div className="setting-label">Custom AI / Gemini API Key</div>
+                      <div className="setting-desc">{settings.customApiKey ? 'Custom key active' : 'Using server default key'}</div>
+                    </div>
+                    <button className="btn btn-secondary btn-sm" onClick={() => { setPluginsOpen(false); setShowSettings(true); }}><KeyRound size={15} /> Configure</button>
+                  </div>
                 </div>
               </motion.div>
             </motion.div>
@@ -454,7 +706,16 @@ export default function AssistantPage() {
         .chat-error{display:flex;align-items:center;gap:8px;padding:12px 14px;border-radius:12px;background:rgba(255,77,77,0.1);color:#ffb3b3;font-size:.9rem;margin-bottom:12px;flex-wrap:wrap}
         .chat-controls{display:flex;flex-direction:column;gap:16px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.06)}
         .tool-row{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
-        .input-row{display:flex;gap:10px;align-items:center}.chat-input{flex:1;min-width:0;height:52px;border-radius:14px}
+        .input-row{position:relative;display:flex;gap:10px;align-items:center}.chat-input{flex:1;min-width:0;height:52px;border-radius:14px}
+        .attach-plus-btn{flex-shrink:0;border-radius:50%}
+        .attach-popup{position:absolute;bottom:calc(100% + 12px);left:0;width:min(280px,calc(100vw - 40px));background:#1e1f24;border:1px solid rgba(255,255,255,0.1);border-radius:20px;padding:8px;box-shadow:0 16px 40px rgba(0,0,0,0.55);z-index:40;display:flex;flex-direction:column;gap:2px}
+        .attach-item{display:flex;align-items:center;gap:12px;width:100%;padding:10px 12px;border-radius:14px;background:transparent;border:none;color:#ffffff;font-size:.95rem;font-weight:500;cursor:pointer;text-align:left;transition:background .15s ease,color .15s ease}
+        .attach-item:hover,.attach-item:focus-visible{background:rgba(255,255,255,0.08);outline:none}
+        .attach-item.active{background:rgba(255,107,53,0.16);color:#fff}
+        .attach-item.active .attach-icon{background:var(--accent);color:#fff}
+        .attach-icon{width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.08);display:grid;place-items:center;flex-shrink:0;color:#fff}
+        .attach-text{flex:1}.attach-check{color:var(--accent);flex-shrink:0}
+        .think-badge{background:rgba(255,107,53,0.16)!important;border-color:rgba(255,107,53,0.5)!important;color:#ffd2c2!important}
         .support-note{margin:0;text-align:center;color:var(--text-muted);font-size:.85rem}
         .settings-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);display:grid;place-items:center;z-index:100;padding:20px}
         .settings-panel{width:min(620px,100%);border-radius:24px;padding:24px;max-height:90vh;overflow:auto}

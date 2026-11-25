@@ -9,9 +9,11 @@ interface SendMessageArgs {
   documentText?: string;
   imageDataUrl?: string;
   locationHint?: string;
+  customApiKey?: string;
+  thinkHarder?: boolean;
 }
 
-export async function sendChatMessage({ messages, language, autoDetect, mode = 'default', memories = [], documentText, imageDataUrl, locationHint }: SendMessageArgs): Promise<ChatResponse & { memoryCandidate?: string }> {
+export async function sendChatMessage({ messages, language, autoDetect, mode = 'default', memories = [], documentText, imageDataUrl, locationHint, customApiKey, thinkHarder = false }: SendMessageArgs): Promise<ChatResponse & { memoryCandidate?: string }> {
   const payload = {
     language,
     autoDetect,
@@ -20,6 +22,8 @@ export async function sendChatMessage({ messages, language, autoDetect, mode = '
     documentText,
     imageDataUrl,
     locationHint,
+    thinkHarder,
+    ...(customApiKey?.trim() ? { customApiKey: customApiKey.trim() } : {}),
     messages: messages.map((m) => ({ role: m.role, content: m.content })),
   };
 
