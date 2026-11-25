@@ -87,6 +87,26 @@ create policy "memories delete own" on public.memories for delete using (auth.ui
 create policy "usage select own" on public.usage_events for select using (auth.uid() = user_id);
 create policy "usage insert own" on public.usage_events for insert with check (auth.uid() = user_id or user_id is null);
 
+-- User API keys (AES-256-GCM encrypted at rest by server)
+create table if not exists public.user_api_keys (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  encrypted_key text not null,
+  iv text not null,
+  auth_tag text not null,
+  key_suffix text not null,
+  provider text not null,
+  model text not null,
+  status text default 'Connected',
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+alter table public.user_api_keys enable row level security;
+create policy "user_api_keys select own" on public.user_api_keys for select using (auth.uid() = user_id);
+create policy "user_api_keys insert own" on public.user_api_keys for insert with check (auth.uid() = user_id);
+create policy "user_api_keys update own" on public.user_api_keys for update using (auth.uid() = user_id);
+create policy "user_api_keys delete own" on public.user_api_keys for delete using (auth.uid() = user_id);
+
 -- Updated-at trigger
 create or replace function public.set_updated_at()
 returns trigger as $$

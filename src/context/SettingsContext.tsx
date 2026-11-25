@@ -11,14 +11,15 @@ const SettingsContext = createContext<SettingsContextValue | null>(null);
 const STORAGE_KEY = 'swar_settings';
 
 function normalizeSettings(parsed: any): UserSettings {
+  const clean = parsed && typeof parsed === 'object' ? { ...parsed } : {};
+  delete clean.customApiKey;
   return {
     ...DEFAULT_SETTINGS,
-    ...(parsed && typeof parsed === 'object' ? parsed : {}),
-    preferredLanguage: ['te-IN', 'hi-IN', 'en-IN'].includes(parsed?.preferredLanguage)
-      ? parsed.preferredLanguage
+    ...clean,
+    preferredLanguage: ['te-IN', 'hi-IN', 'en-IN'].includes(clean?.preferredLanguage)
+      ? clean.preferredLanguage
       : DEFAULT_SETTINGS.preferredLanguage,
-    speechRate: typeof parsed?.speechRate === 'number' ? Math.min(1.5, Math.max(0.7, parsed.speechRate)) : DEFAULT_SETTINGS.speechRate,
-    customApiKey: typeof parsed?.customApiKey === 'string' ? parsed.customApiKey.trim() : '',
+    speechRate: typeof clean?.speechRate === 'number' ? Math.min(1.5, Math.max(0.7, clean.speechRate)) : DEFAULT_SETTINGS.speechRate,
   };
 }
 

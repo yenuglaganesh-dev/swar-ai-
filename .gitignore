@@ -30,3 +30,7 @@ Thumbs.db
 # TypeScript build info
 *.tsbuildinfo
 
+# Encrypted local key store
+.swar-keys.enc.json
+
+

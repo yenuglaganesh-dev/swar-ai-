@@ -3,6 +3,16 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import {
+  verifySupabaseAuth,
+  verifyProviderKey,
+  getUserKeyRecord,
+  saveUserKeyRecord,
+  deleteUserKeyRecord,
+  decryptApiKey,
+  resolveProviderConfig,
+  isPlaceholderKey,
+} from './keyStore.js';
 
 dotenv.config();
 
@@ -26,6 +36,7 @@ app.use(cors({
     return callback(null, false);
   },
   credentials: true,
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 app.use(express.json({ limit: '1mb' }));
 
@@ -167,12 +178,112 @@ app.get('/api/health', (_req, res) => {
   res.json({
     ok: true,
     name: 'SWAR AI',
-    aiConfigured: Boolean(process.env.AI_API_KEY),
-    weatherConfigured: Boolean(process.env.WEATHER_API_KEY),
-    newsConfigured: Boolean(process.env.NEWS_API_KEY),
+    aiConfigured: !isPlaceholderKey(process.env.AI_API_KEY),
+    weatherConfigured: !isPlaceholderKey(process.env.WEATHER_API_KEY),
+    newsConfigured: !isPlaceholderKey(process.env.NEWS_API_KEY),
     visionModel: process.env.AI_VISION_MODEL || process.env.AI_MODEL || 'gpt-4o-mini',
     time: new Date().toISOString(),
   });
+});
+
+app.get('/api/key', async (req, res) => {
+  const auth = await verifySupabaseAuth(req);
+  if (!auth) {
+    return res.status(401).json({ ok: false, error: 'UNAUTHORIZED', message: 'Please sign in to manage your API key.' });
+  }
+  const record = await getUserKeyRecord(auth);
+  if (!record) {
+    return res.json({ ok: true, configured: false, connectionState: 'Not Configured' });
+  }
+  return res.json({
+    ok: true,
+    configured: true,
+    provider: record.provider,
+    model: record.model,
+    keySuffix: record.key_suffix,
+    connectionState: record.status || 'Connected',
+    updatedAt: record.updated_at,
+  });
+});
+
+app.post('/api/key/activate', async (req, res) => {
+  const auth = await verifySupabaseAuth(req);
+  if (!auth) {
+    return res.status(401).json({ ok: false, connectionState: 'Connection Failed', error: 'UNAUTHORIZED', message: 'Please sign in before activating an API key.' });
+  }
+  const rawKey = typeof req.body?.apiKey === 'string' ? req.body.apiKey.trim() : '';
+  if (!rawKey) {
+    return res.status(400).json({ ok: false, connectionState: 'Invalid API Key', error: 'EMPTY_KEY', message: 'API key cannot be empty.' });
+  }
+
+  const verification = await verifyProviderKey(rawKey);
+  if (!verification.ok) {
+    return res.status(verification.httpStatus || 400).json({
+      ok: false,
+      configured: false,
+      connectionState: verification.connectionState,
+      provider: verification.provider,
+      model: verification.model,
+      error: verification.errorCode,
+      message: verification.message,
+    });
+  }
+
+  const saved = await saveUserKeyRecord(auth, rawKey, verification);
+  return res.json({
+    ok: true,
+    ...saved,
+    message: 'API Key Activated Successfully',
+  });
+});
+
+app.post('/api/key/test', async (req, res) => {
+  const auth = await verifySupabaseAuth(req);
+  if (!auth) {
+    return res.status(401).json({ ok: false, connectionState: 'Connection Failed', error: 'UNAUTHORIZED', message: 'Please sign in to test your API key.' });
+  }
+  const record = await getUserKeyRecord(auth);
+  if (!record) {
+    const serverKey = !isPlaceholderKey(process.env.AI_API_KEY) ? String(process.env.AI_API_KEY).trim() : '';
+    if (!serverKey) {
+      return res.json({ ok: false, configured: false, connectionState: 'Not Configured', message: 'No active API key configured.' });
+    }
+    const check = await verifyProviderKey(serverKey);
+    return res.status(check.ok ? 200 : (check.httpStatus || 502)).json({
+      ok: check.ok,
+      configured: true,
+      source: 'server',
+      connectionState: check.connectionState,
+      provider: check.provider,
+      model: check.model,
+      message: check.message,
+    });
+  }
+
+  const plainKey = decryptApiKey(record);
+  if (!plainKey) {
+    return res.status(500).json({ ok: false, configured: false, connectionState: 'Connection Failed', error: 'DECRYPT_FAILED', message: 'Stored key could not be decrypted. Please re-enter your key.' });
+  }
+  const check = await verifyProviderKey(plainKey);
+  return res.status(check.ok ? 200 : (check.httpStatus || 502)).json({
+    ok: check.ok,
+    configured: true,
+    source: 'user',
+    keySuffix: record.key_suffix,
+    connectionState: check.connectionState,
+    provider: check.provider,
+    model: check.model,
+    message: check.message,
+  });
+});
+
+app.delete('/api/key', async (req, res) => {
+  const auth = await verifySupabaseAuth(req);
+  if (!auth) {
+    return res.status(401).json({ ok: false, error: 'UNAUTHORIZED', message: 'Please sign in to remove your API key.' });
+  }
+  await deleteUserKeyRecord(auth);
+  return res.json({ ok: true, configured: false, connectionState: 'Not Configured', message: 'API key removed.' });
 });
 
 function parseJsonSafe(text) { try { return JSON.parse(text); } catch { return null; } }
@@ -309,15 +420,20 @@ app.post('/api/chat', async (req, res) => {
   // Unicode-script detection is reliable for Telugu and Hindi; English is the fallback.
   const detectedFromText = detectLanguageFromText(lastUser);
   const responseLanguage = autoDetect ? detectedFromText : language;
-  const customApiKey = typeof body.customApiKey === 'string' ? body.customApiKey.trim() : '';
-  const apiKey = customApiKey || process.env.AI_API_KEY;
-  const isGeminiKey = Boolean(apiKey && apiKey.startsWith('AIza'));
-  const apiUrl = isGeminiKey
-    ? 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions'
-    : (process.env.AI_API_URL || 'https://opencode.ai/inference/openai/v1/chat/completions');
-  const model = isGeminiKey
-    ? (process.env.GEMINI_MODEL || 'gemini-2.5-flash')
-    : (process.env.AI_MODEL || 'big-pickle');
+
+  const auth = await verifySupabaseAuth(req);
+  let apiKey = '';
+  if (auth) {
+    const userRecord = await getUserKeyRecord(auth);
+    if (userRecord) {
+      apiKey = decryptApiKey(userRecord);
+    }
+  }
+  if (!apiKey && !isPlaceholderKey(process.env.AI_API_KEY)) {
+    apiKey = String(process.env.AI_API_KEY).trim();
+  }
+
+  const { isGeminiKey, provider, model, apiUrl } = resolveProviderConfig(apiKey);
   const visionModel = isGeminiKey ? model : (process.env.AI_VISION_MODEL || model);
 
   let liveContext = '';
@@ -419,7 +535,7 @@ app.post('/api/chat', async (req, res) => {
         : response.status === 429 ? 'AI_RATE_LIMITED'
           : response.status === 404 ? 'AI_MODEL_OR_ENDPOINT_ERROR'
             : response.status === 400 ? 'AI_BAD_REQUEST' : 'AI_UPSTREAM_ERROR';
-      console.error('AI API error', { provider: isGeminiKey ? 'gemini' : 'opencode', status: response.status, code: safeCode, message: safeProviderMessage });
+      console.error('AI API error', { provider, status: response.status, code: safeCode, message: safeProviderMessage });
       return res.status(502).json({
         ...fallbackResponse('', responseLanguage, reason),
         providerStatus: response.status,

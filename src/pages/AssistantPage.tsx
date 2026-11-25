@@ -14,7 +14,7 @@ import { useAuth } from '@/context/AuthContext';
 import { AssistantStatus, ChatMessage, LanguageCode } from '@/types';
 import { createRecognition, isSpeechRecognitionSupported } from '@/services/speechRecognition';
 import { isSpeechSynthesisSupported, speakText, stopSpeaking } from '@/services/speechSynthesis';
-import { sendChatMessage } from '@/services/aiAssistant';
+import { sendChatMessage, fetchApiKeyStatus, activateApiKey, testApiKeyConnection, removeApiKey, type ApiKeyStatus } from '@/services/aiAssistant';
 import { safeStorage, safeJsonParse } from '@/services/safeStorage';
 import { detectLanguageFromText } from '@/services/languageDetection';
 import { addMemory, createConversation, getProfile, listMemories, logUsage, saveMessage, upsertProfile } from '@/services/dataStore';
@@ -34,8 +34,10 @@ export default function AssistantPage() {
   const [error, setError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
-  const [apiKeyDraft, setApiKeyDraft] = useState(settings.customApiKey);
-  const [apiKeySaved, setApiKeySaved] = useState(false);
+  const [apiKeyDraft, setApiKeyDraft] = useState('');
+  const [keyStatus, setKeyStatus] = useState<ApiKeyStatus>({ ok: true, configured: false, connectionState: 'Not Configured' });
+  const [keyBusy, setKeyBusy] = useState(false);
+  const [keyFeedback, setKeyFeedback] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
   const [attachMenuOpen, setAttachMenuOpen] = useState(false);
   const [pluginsOpen, setPluginsOpen] = useState(false);
   const [thinkHarder, setThinkHarder] = useState(false);
@@ -74,7 +76,13 @@ export default function AssistantPage() {
   const ttsSupported = isSpeechSynthesisSupported();
 
   useEffect(() => { setContinuous(settings.continuousMode); }, [settings.continuousMode]);
-  useEffect(() => { setApiKeyDraft(settings.customApiKey); }, [settings.customApiKey]);
+  useEffect(() => {
+    if (!user) {
+      setKeyStatus({ ok: true, configured: false, connectionState: 'Not Configured' });
+      return;
+    }
+    fetchApiKeyStatus().then((st) => setKeyStatus(st));
+  }, [user?.uid]);
   useEffect(() => { if (settings.saveHistory) try { localStorage.setItem(HISTORY_KEY, JSON.stringify(messages.slice(-50))); } catch {} }, [messages, settings.saveHistory]);
   useEffect(() => { if (!settings.saveHistory) safeStorage.removeItem(HISTORY_KEY); }, [settings.saveHistory]);
   useEffect(() => { document.documentElement.dataset.theme = 'dark'; }, []);
@@ -185,7 +193,6 @@ export default function AssistantPage() {
       const res = await sendChatMessage({
         messages: nextMessages, language: userLang, autoDetect: settings.autoDetectLanguage,
         mode: activeMode, memories: settings.memoryConsent ? memories : [], documentText: docText, imageDataUrl, locationHint,
-        customApiKey: settings.customApiKey,
         thinkHarder,
       });
       const replyLang = (res.detectedLanguage || userLang) as LanguageCode;
@@ -442,6 +449,50 @@ export default function AssistantPage() {
     ctx.drawImage(video, 0, 0); setImageDataUrl(canvas.toDataURL('image/jpeg', 0.8)); stopCamera();
   };
 
+  const handleActivateKey = async () => {
+    const trimmed = apiKeyDraft.trim();
+    if (!trimmed) {
+      setKeyFeedback({ type: 'err', text: 'Please paste an API key first.' });
+      return;
+    }
+    setKeyBusy(true);
+    setKeyFeedback(null);
+    setKeyStatus((prev) => ({ ...prev, connectionState: 'Testing Connection' }));
+    const res = await activateApiKey(trimmed);
+    setKeyBusy(false);
+    setKeyStatus(res);
+    if (res.ok) {
+      setApiKeyDraft('');
+      setError(null);
+      setKeyFeedback({ type: 'ok', text: 'API Key Activated Successfully' });
+    } else {
+      setKeyFeedback({ type: 'err', text: res.message || 'API key verification failed.' });
+    }
+  };
+
+  const handleTestConnection = async () => {
+    setKeyBusy(true);
+    setKeyFeedback(null);
+    setKeyStatus((prev) => ({ ...prev, connectionState: 'Testing Connection' }));
+    const res = await testApiKeyConnection();
+    setKeyBusy(false);
+    setKeyStatus(res);
+    setKeyFeedback({
+      type: res.ok ? 'ok' : 'err',
+      text: res.message || res.connectionState,
+    });
+  };
+
+  const handleRemoveKey = async () => {
+    setKeyBusy(true);
+    setKeyFeedback(null);
+    const res = await removeApiKey();
+    setKeyBusy(false);
+    setKeyStatus(res);
+    setApiKeyDraft('');
+    setKeyFeedback({ type: 'ok', text: 'API key removed.' });
+  };
+
   const saveMemoryCandidate = async () => {
     if (!memoryCandidate || !user) { setMemoryCandidate(null); return; }
     await addMemory(user.uid, memoryCandidate);
@@ -637,64 +688,58 @@ export default function AssistantPage() {
                   <div className="setting-row"><div><div className="setting-label">{t('speechRate')}</div><div className="setting-desc">{settings.speechRate.toFixed(1)}x</div></div><input type="range" min="0.7" max="1.5" step="0.1" value={settings.speechRate} onChange={(e) => updateSettings({ speechRate: Number(e.target.value) })} /></div>
                   <div className="setting-row"><div><div className="setting-label">{t('location')}</div></div><input className="input" style={{ maxWidth: 220 }} value={locationHint} onChange={(e) => { setLocationHint(e.target.value); safeStorage.setItem('swar_location', e.target.value); }} /></div>
                   <div className="setting-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 10 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                       <div>
-                        <div className="setting-label" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><KeyRound size={15} /> Custom AI API Key</div>
+                        <div className="setting-label" style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                          <KeyRound size={15} /> Custom AI API Key
+                          <span className={`key-state-badge state-${keyStatus.connectionState.toLowerCase().replace(/\s+/g, '-')}`}>
+                            {keyStatus.connectionState}
+                          </span>
+                        </div>
                         <div className="setting-desc">
-                          {apiKeySaved
-                            ? 'API Key saved and active!'
-                            : settings.customApiKey
-                              ? 'Using your custom API key (saved in browser)'
-                              : 'Using server default key. Paste a Gemini (AIza...) or OpenCode key and click Set Key.'}
+                          {!user
+                            ? <>Please <Link to="/auth" className="link-btn">sign in</Link> to save and activate your personal API key securely.</>
+                            : keyStatus.configured
+                              ? `Active key: ${keyStatus.keySuffix || '••••'} (${keyStatus.provider || 'AI'} • ${keyStatus.model || 'default'})`
+                              : 'Paste a Gemini (AIza...) or OpenCode key and click Set Key to verify & activate.'}
                         </div>
                       </div>
-                      {(settings.customApiKey || apiKeyDraft) && (
-                        <button
-                          className="btn btn-ghost btn-sm"
-                          type="button"
-                          onClick={() => {
-                            setApiKeyDraft('');
-                            updateSettings({ customApiKey: '' });
-                            setApiKeySaved(false);
-                          }}
-                        >
-                          Clear
+                      {user && keyStatus.configured && (
+                        <button className="btn btn-ghost btn-sm" type="button" disabled={keyBusy} onClick={handleRemoveKey}>
+                          Remove Key
                         </button>
                       )}
                     </div>
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                      <input
-                        className="input"
-                        style={{ flex: 1, minWidth: 180 }}
-                        type={showApiKey ? 'text' : 'password'}
-                        value={apiKeyDraft}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setApiKeyDraft(val);
-                          updateSettings({ customApiKey: val.trim() });
-                          setApiKeySaved(false);
-                        }}
-                        placeholder="Paste Gemini (AIza...) or OpenCode API key"
-                        autoComplete="off"
-                      />
-                      <button className="btn btn-secondary btn-icon" type="button" onClick={() => setShowApiKey((v) => !v)} aria-label={showApiKey ? 'Hide API key' : 'Show API key'}>
-                        {showApiKey ? <EyeOff size={16} /> : <Eye size={16} />}
-                      </button>
-                      <button
-                        className="btn btn-primary btn-sm"
-                        type="button"
-                        disabled={!apiKeyDraft.trim()}
-                        onClick={() => {
-                          const trimmed = apiKeyDraft.trim();
-                          updateSettings({ customApiKey: trimmed });
-                          setApiKeySaved(true);
-                          setError(null);
-                          setTimeout(() => setApiKeySaved(false), 3000);
-                        }}
-                      >
-                        <Check size={15} /> Set Key
-                      </button>
-                    </div>
+                    {user && (
+                      <>
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                          <input
+                            className="input"
+                            style={{ flex: 1, minWidth: 180 }}
+                            type={showApiKey ? 'text' : 'password'}
+                            value={apiKeyDraft}
+                            onChange={(e) => { setApiKeyDraft(e.target.value); setKeyFeedback(null); }}
+                            placeholder={keyStatus.configured ? 'Paste new key to replace active key' : 'Paste Gemini (AIza...) or OpenCode API key'}
+                            autoComplete="off"
+                            disabled={keyBusy}
+                          />
+                          <button className="btn btn-secondary btn-icon" type="button" onClick={() => setShowApiKey((v) => !v)} aria-label={showApiKey ? 'Hide API key' : 'Show API key'}>
+                            {showApiKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                          </button>
+                          <button className="btn btn-primary btn-sm" type="button" disabled={keyBusy || !apiKeyDraft.trim()} onClick={handleActivateKey}>
+                            <Check size={15} /> {keyBusy ? 'Verifying...' : 'Set Key'}
+                          </button>
+                          <button className="btn btn-secondary btn-sm" type="button" disabled={keyBusy} onClick={handleTestConnection}>
+                            Test Connection
+                          </button>
+                        </div>
+                        {keyFeedback && (
+                          <div className={`setting-desc`} style={{ color: keyFeedback.type === 'ok' ? '#7ef0b5' : '#ffb3b3', fontWeight: 500 }}>
+                            {keyFeedback.text}
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
                   <button className="btn btn-secondary" onClick={clearHistory}><Trash2 size={16} /> {t('clearHistory')}</button>
                 </div>
@@ -729,7 +774,7 @@ export default function AssistantPage() {
                   <div className="setting-row">
                     <div>
                       <div className="setting-label">Custom AI / Gemini API Key</div>
-                      <div className="setting-desc">{settings.customApiKey ? 'Custom key active' : healthStatus?.aiConfigured ? 'Using server default key' : 'Needs API key configuration'}</div>
+                      <div className="setting-desc">{keyStatus.configured ? `${keyStatus.connectionState} (${keyStatus.keySuffix || '••••'})` : healthStatus?.aiConfigured ? 'Using server default key' : 'Needs API key configuration'}</div>
                     </div>
                     <button className="btn btn-secondary btn-sm" onClick={() => { setPluginsOpen(false); setShowSettings(true); }}><KeyRound size={15} /> Configure</button>
                   </div>
@@ -777,6 +822,11 @@ export default function AssistantPage() {
         .attach-icon{width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.08);display:grid;place-items:center;flex-shrink:0;color:#fff}
         .attach-text{flex:1}.attach-check{color:var(--accent);flex-shrink:0}
         .think-badge{background:rgba(255,107,53,0.16)!important;border-color:rgba(255,107,53,0.5)!important;color:#ffd2c2!important}
+        .key-state-badge{font-size:.75rem;padding:2px 8px;border-radius:999px;font-weight:600;background:rgba(255,255,255,0.08);color:#ddd}
+        .key-state-badge.state-connected{background:rgba(46,204,113,0.18);color:#7ef0b5}
+        .key-state-badge.state-testing-connection{background:rgba(255,154,90,0.2);color:#ffd2c2}
+        .key-state-badge.state-invalid-api-key,.key-state-badge.state-connection-failed{background:rgba(255,77,77,0.18);color:#ffb3b3}
+        .key-state-badge.state-insufficient-credits,.key-state-badge.state-rate-limited{background:rgba(255,193,7,0.18);color:#ffe082}
         .support-note{margin:0;text-align:center;color:var(--text-muted);font-size:.85rem}
         .settings-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);display:grid;place-items:center;z-index:100;padding:20px}
         .settings-panel{width:min(620px,100%);border-radius:24px;padding:24px;max-height:90vh;overflow:auto}

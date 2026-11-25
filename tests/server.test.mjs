@@ -3,6 +3,15 @@ import assert from 'node:assert/strict';
 
 process.env.VERCEL = '1';
 const { default: app, detectLanguageFromText, detectIntentKeywords } = await import('../server/index.js');
+const {
+  encryptApiKey,
+  decryptApiKey,
+  isPlaceholderKey,
+  saveUserKeyRecord,
+  getUserKeyRecord,
+  deleteUserKeyRecord,
+  verifyProviderKey,
+} = await import('../server/keyStore.js');
 
 test('detectLanguageFromText handles English, Telugu, Hindi, and mixed scripts', () => {
   assert.equal(detectLanguageFromText('Hello, how are you today?'), 'en-IN');
@@ -47,7 +56,43 @@ test('Express /api/health and /api/chat validation & safe error responses', asyn
       body: JSON.stringify({ messages: [{ role: 'user', content: '   ' }], language: 'en-IN' }),
     });
     assert.equal(emptyMsgRes.status, 400);
+
+    // Key management endpoints must reject unauthenticated requests with 401
+    for (const [method, path] of [['GET', '/api/key'], ['POST', '/api/key/activate'], ['POST', '/api/key/test'], ['DELETE', '/api/key']]) {
+      const r = await fetch(`${baseUrl}${path}`, { method, headers: { 'Content-Type': 'application/json' }, body: method === 'POST' ? '{}' : undefined });
+      assert.equal(r.status, 401, `${method} ${path} should require auth`);
+    }
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
+});
+
+test('Encrypted keyStore isolates users, masks suffixes, and rejects placeholders', async () => {
+  assert.equal(isPlaceholderKey('your_opencode_api_key_here'), true);
+  assert.equal(isPlaceholderKey(''), true);
+  assert.equal(isPlaceholderKey('AIzaSyTestKey123456'), false);
+
+  const enc = encryptApiKey('AIzaSyTestKey9876');
+  assert.equal(enc.key_suffix, '••••9876');
+  assert.notEqual(enc.encrypted_key, 'AIzaSyTestKey9876');
+  assert.equal(decryptApiKey(enc), 'AIzaSyTestKey9876');
+
+  const userA = { userId: 'test-user-a' };
+  const userB = { userId: 'test-user-b' };
+  await saveUserKeyRecord(userA, 'AIzaSyUserAKey1111', { provider: 'gemini', model: 'gemini-2.5-flash', connectionState: 'Connected' });
+  await saveUserKeyRecord(userB, 'AIzaSyUserBKey2222', { provider: 'gemini', model: 'gemini-2.5-flash', connectionState: 'Connected' });
+
+  const recA = await getUserKeyRecord(userA);
+  const recB = await getUserKeyRecord(userB);
+  assert.equal(decryptApiKey(recA), 'AIzaSyUserAKey1111');
+  assert.equal(decryptApiKey(recB), 'AIzaSyUserBKey2222');
+
+  await deleteUserKeyRecord(userA);
+  assert.equal(await getUserKeyRecord(userA), null);
+  assert.equal(decryptApiKey(await getUserKeyRecord(userB)), 'AIzaSyUserBKey2222');
+  await deleteUserKeyRecord(userB);
+
+  const emptyVerify = await verifyProviderKey('   ');
+  assert.equal(emptyVerify.ok, false);
+  assert.equal(emptyVerify.connectionState, 'Invalid API Key');
 });

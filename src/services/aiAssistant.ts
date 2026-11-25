@@ -1,4 +1,41 @@
 import { ChatMessage, ChatResponse, LanguageCode } from '@/types';
+import { getSupabase } from './supabase';
+
+export type ConnectionState =
+  | 'Not Configured'
+  | 'Testing Connection'
+  | 'Connected'
+  | 'Invalid API Key'
+  | 'Insufficient Credits'
+  | 'Rate Limited'
+  | 'Connection Failed';
+
+export interface ApiKeyStatus {
+  ok: boolean;
+  configured: boolean;
+  provider?: string;
+  model?: string;
+  keySuffix?: string;
+  connectionState: ConnectionState;
+  updatedAt?: string;
+  error?: string;
+  message?: string;
+}
+
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  try {
+    const sb = getSupabase();
+    if (sb) {
+      const { data } = await sb.auth.getSession();
+      const token = data?.session?.access_token;
+      if (token) headers.Authorization = `Bearer ${token}`;
+    }
+  } catch {
+    /* ignore */
+  }
+  return headers;
+}
 
 interface SendMessageArgs {
   messages: ChatMessage[];
@@ -9,11 +46,10 @@ interface SendMessageArgs {
   documentText?: string;
   imageDataUrl?: string;
   locationHint?: string;
-  customApiKey?: string;
   thinkHarder?: boolean;
 }
 
-export async function sendChatMessage({ messages, language, autoDetect, mode = 'default', memories = [], documentText, imageDataUrl, locationHint, customApiKey, thinkHarder = false }: SendMessageArgs): Promise<ChatResponse & { memoryCandidate?: string }> {
+export async function sendChatMessage({ messages, language, autoDetect, mode = 'default', memories = [], documentText, imageDataUrl, locationHint, thinkHarder = false }: SendMessageArgs): Promise<ChatResponse & { memoryCandidate?: string }> {
   const payload = {
     language,
     autoDetect,
@@ -23,7 +59,6 @@ export async function sendChatMessage({ messages, language, autoDetect, mode = '
     imageDataUrl,
     locationHint,
     thinkHarder,
-    ...(customApiKey?.trim() ? { customApiKey: customApiKey.trim() } : {}),
     messages: messages.map((m) => ({ role: m.role, content: m.content })),
   };
 
@@ -31,9 +66,10 @@ export async function sendChatMessage({ messages, language, autoDetect, mode = '
   const timeout = window.setTimeout(() => controller.abort(), 45000);
   let res: Response;
   try {
+    const headers = await getAuthHeaders();
     res = await fetch('/api/chat', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(payload),
       signal: controller.signal,
     });
@@ -79,6 +115,88 @@ async function postJson<T>(url: string, body: unknown, timeoutMs = 15000): Promi
   } catch (e) {
     return { ok: false, configured: true, error: e instanceof Error && e.name === 'AbortError' ? 'TIMEOUT' : 'NETWORK_ERROR', message: e instanceof Error ? e.message : 'Request failed' };
   } finally { window.clearTimeout(timer); }
+}
+
+export async function fetchApiKeyStatus(): Promise<ApiKeyStatus> {
+  try {
+    const headers = await getAuthHeaders();
+    const res = await fetch('/api/key', { method: 'GET', headers });
+    const data = await res.json().catch(() => ({}));
+    return {
+      ok: res.ok && Boolean(data?.ok ?? true),
+      configured: Boolean(data?.configured),
+      provider: data?.provider,
+      model: data?.model,
+      keySuffix: data?.keySuffix,
+      connectionState: data?.connectionState || (data?.configured ? 'Connected' : 'Not Configured'),
+      updatedAt: data?.updatedAt,
+      error: data?.error,
+      message: data?.message,
+    };
+  } catch {
+    return { ok: false, configured: false, connectionState: 'Connection Failed', message: 'Could not reach server.' };
+  }
+}
+
+export async function activateApiKey(apiKey: string): Promise<ApiKeyStatus> {
+  try {
+    const headers = await getAuthHeaders();
+    const res = await fetch('/api/key/activate', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ apiKey: apiKey.trim() }),
+    });
+    const data = await res.json().catch(() => ({}));
+    return {
+      ok: res.ok && Boolean(data?.ok),
+      configured: Boolean(data?.configured),
+      provider: data?.provider,
+      model: data?.model,
+      keySuffix: data?.keySuffix,
+      connectionState: data?.connectionState || (res.ok ? 'Connected' : 'Connection Failed'),
+      updatedAt: data?.updatedAt,
+      error: data?.error,
+      message: data?.message || (res.ok ? 'API Key Activated Successfully' : 'Failed to activate API key.'),
+    };
+  } catch {
+    return { ok: false, configured: false, connectionState: 'Connection Failed', message: 'Network error while verifying API key.' };
+  }
+}
+
+export async function testApiKeyConnection(): Promise<ApiKeyStatus> {
+  try {
+    const headers = await getAuthHeaders();
+    const res = await fetch('/api/key/test', { method: 'POST', headers });
+    const data = await res.json().catch(() => ({}));
+    return {
+      ok: res.ok && Boolean(data?.ok),
+      configured: Boolean(data?.configured),
+      provider: data?.provider,
+      model: data?.model,
+      keySuffix: data?.keySuffix,
+      connectionState: data?.connectionState || (res.ok ? 'Connected' : 'Connection Failed'),
+      error: data?.error,
+      message: data?.message,
+    };
+  } catch {
+    return { ok: false, configured: false, connectionState: 'Connection Failed', message: 'Network error while testing connection.' };
+  }
+}
+
+export async function removeApiKey(): Promise<ApiKeyStatus> {
+  try {
+    const headers = await getAuthHeaders();
+    const res = await fetch('/api/key', { method: 'DELETE', headers });
+    const data = await res.json().catch(() => ({}));
+    return {
+      ok: res.ok && Boolean(data?.ok),
+      configured: false,
+      connectionState: 'Not Configured',
+      message: data?.message || 'API key removed.',
+    };
+  } catch {
+    return { ok: false, configured: false, connectionState: 'Connection Failed', message: 'Failed to remove API key.' };
+  }
 }
 
 export async function fetchWeather(location: string): Promise<ApiResult<WeatherData>> {
