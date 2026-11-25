@@ -1,8 +1,11 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import dns from 'node:dns';
 import path from 'path';
 import { fileURLToPath } from 'url';
+
+dns.setDefaultResultOrder('ipv4first');
 import mammoth from 'mammoth';
 import { extractText as extractPdfText } from 'unpdf';
 import {
