@@ -142,7 +142,7 @@ export async function fetchApiKeyStatus(): Promise<ApiKeyStatus> {
 export async function activateApiKey(apiKey: string): Promise<ApiKeyStatus> {
   try {
     const headers = await getAuthHeaders();
-    const res = await fetch('/api/key/activate', {
+    const res = await fetch('/api/key-activate', {
       method: 'POST',
       headers,
       credentials: 'include',
@@ -177,7 +177,7 @@ export async function activateApiKey(apiKey: string): Promise<ApiKeyStatus> {
 export async function testApiKeyConnection(): Promise<ApiKeyStatus> {
   try {
     const headers = await getAuthHeaders();
-    const res = await fetch('/api/key/test', { method: 'POST', headers, credentials: 'include' });
+    const res = await fetch('/api/key-test', { method: 'POST', headers, credentials: 'include' });
     const data = await res.json().catch(() => ({}));
     return {
       ok: res.ok && Boolean(data?.ok),

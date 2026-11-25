@@ -208,7 +208,7 @@ app.get('/api/key', async (req, res) => {
   });
 });
 
-app.post('/api/key/activate', async (req, res) => {
+async function handleKeyActivate(req, res) {
   const owner = await resolveKeyOwner(req, res, { createGuest: true });
   const rawKey = typeof req.body?.apiKey === 'string' ? req.body.apiKey.trim() : '';
   if (!rawKey) {
@@ -234,9 +234,9 @@ app.post('/api/key/activate', async (req, res) => {
     ...saved,
     message: 'API Key Activated Successfully',
   });
-});
+}
 
-app.post('/api/key/test', async (req, res) => {
+async function handleKeyTest(req, res) {
   const owner = await resolveKeyOwner(req, res, { createGuest: false });
   const record = owner ? await getUserKeyRecord(owner) : null;
   if (!record) {
@@ -271,7 +271,12 @@ app.post('/api/key/test', async (req, res) => {
     model: check.model,
     message: check.message,
   });
-});
+}
+
+app.post('/api/key/activate', handleKeyActivate);
+app.post('/api/key-activate', handleKeyActivate);
+app.post('/api/key/test', handleKeyTest);
+app.post('/api/key-test', handleKeyTest);
 
 app.delete('/api/key', async (req, res) => {
   const owner = await resolveKeyOwner(req, res, { createGuest: false });
