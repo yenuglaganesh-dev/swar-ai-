@@ -10,13 +10,15 @@ const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
 export async function upsertProfile(userId: string, profile: Record<string, unknown>) {
   const sb = getSupabase();
   if (!sb) return;
-  await sb.from('profiles').upsert({ id: userId, ...profile, updated_at: new Date().toISOString() });
+  const { error } = await sb.from('profiles').upsert({ id: userId, ...profile, updated_at: new Date().toISOString() });
+  if (error) { console.warn('upsertProfile error:', error.message); throw new Error(error.message); }
 }
 
 export async function getProfile(userId: string) {
   const sb = getSupabase();
   if (!sb) return null;
-  const { data } = await sb.from('profiles').select('*').eq('id', userId).maybeSingle();
+  const { data, error } = await sb.from('profiles').select('*').eq('id', userId).maybeSingle();
+  if (error) console.warn('getProfile error:', error.message);
   return data;
 }
 
@@ -31,7 +33,7 @@ export async function createConversation(userId: string, language: LanguageCode,
 export async function saveMessage(userId: string, conversationId: string, msg: ChatMessage) {
   const sb = getSupabase();
   if (!sb) return;
-  await sb.from('messages').insert({
+  const { error } = await sb.from('messages').insert({
     conversation_id: conversationId,
     user_id: userId,
     role: msg.role,
@@ -39,19 +41,22 @@ export async function saveMessage(userId: string, conversationId: string, msg: C
     language: msg.language,
     suggestions: msg.suggestions || [],
   });
+  if (error) console.warn('saveMessage error:', error.message);
 }
 
 export async function listConversations(userId: string): Promise<ConversationRecord[]> {
   const sb = getSupabase();
   if (!sb) return [];
-  const { data } = await sb.from('conversations').select('id,title,language,created_at,updated_at').eq('user_id', userId).order('updated_at', { ascending: false }).limit(30);
+  const { data, error } = await sb.from('conversations').select('id,title,language,created_at,updated_at').eq('user_id', userId).order('updated_at', { ascending: false }).limit(30);
+  if (error) console.warn('listConversations error:', error.message);
   return (data || []) as ConversationRecord[];
 }
 
 export async function getConversationMessages(userId: string, conversationId: string): Promise<ChatMessage[]> {
   const sb = getSupabase();
   if (!sb) return [];
-  const { data } = await sb.from('messages').select('id,role,content,language,suggestions,created_at').eq('user_id', userId).eq('conversation_id', conversationId).order('created_at', { ascending: true }).limit(200);
+  const { data, error } = await sb.from('messages').select('id,role,content,language,suggestions,created_at').eq('user_id', userId).eq('conversation_id', conversationId).order('created_at', { ascending: true }).limit(200);
+  if (error) console.warn('getConversationMessages error:', error.message);
   return (data || []).map((m: any) => ({
     id: m.id, role: m.role, content: m.content, language: m.language || 'en-IN', timestamp: new Date(m.created_at).getTime(), suggestions: m.suggestions || [],
   }));
@@ -60,7 +65,8 @@ export async function getConversationMessages(userId: string, conversationId: st
 export async function deleteConversation(userId: string, conversationId: string) {
   const sb = getSupabase();
   if (!sb) return;
-  await sb.from('conversations').delete().eq('id', conversationId).eq('user_id', userId);
+  const { error } = await sb.from('conversations').delete().eq('id', conversationId).eq('user_id', userId);
+  if (error) { console.warn('deleteConversation error:', error.message); throw new Error(error.message); }
 }
 
 export async function addMemory(userId: string, content: string) {
@@ -72,7 +78,8 @@ export async function addMemory(userId: string, content: string) {
     safeStorage.setItem(key, JSON.stringify(existing.slice(0, 50)));
     return;
   }
-  await sb.from('memories').insert({ user_id: userId, content: content.slice(0, 500) });
+  const { error } = await sb.from('memories').insert({ user_id: userId, content: content.slice(0, 500) });
+  if (error) { console.warn('addMemory error:', error.message); throw new Error(error.message); }
 }
 
 export async function listMemories(userId: string): Promise<MemoryItem[]> {
@@ -81,7 +88,8 @@ export async function listMemories(userId: string): Promise<MemoryItem[]> {
     const key = `swar_memories_${userId}`;
     try { return safeJsonParse<any[]>(safeStorage.getItem(key), []); } catch { return []; }
   }
-  const { data } = await sb.from('memories').select('id,content,created_at').eq('user_id', userId).order('created_at', { ascending: false }).limit(50);
+  const { data, error } = await sb.from('memories').select('id,content,created_at').eq('user_id', userId).order('created_at', { ascending: false }).limit(50);
+  if (error) console.warn('listMemories error:', error.message);
   return (data || []) as MemoryItem[];
 }
 
@@ -93,13 +101,15 @@ export async function deleteMemory(userId: string, id: string) {
     safeStorage.setItem(key, JSON.stringify(existing));
     return;
   }
-  await sb.from('memories').delete().eq('id', id).eq('user_id', userId);
+  const { error } = await sb.from('memories').delete().eq('id', id).eq('user_id', userId);
+  if (error) { console.warn('deleteMemory error:', error.message); throw new Error(error.message); }
 }
 
 export async function clearMemories(userId: string) {
   const sb = getSupabase();
   if (!sb) { safeStorage.removeItem(`swar_memories_${userId}`); return; }
-  await sb.from('memories').delete().eq('user_id', userId);
+  const { error } = await sb.from('memories').delete().eq('user_id', userId);
+  if (error) { console.warn('clearMemories error:', error.message); throw new Error(error.message); }
 }
 
 export async function logUsage(userId: string | null, eventType: string, metadata: Record<string, unknown> = {}) {
@@ -111,7 +121,8 @@ export async function logUsage(userId: string | null, eventType: string, metadat
     safeStorage.setItem(key, JSON.stringify(existing.slice(0, 200)));
     return;
   }
-  await sb.from('usage_events').insert({ user_id: userId, event_type: eventType, metadata });
+  const { error } = await sb.from('usage_events').insert({ user_id: userId, event_type: eventType, metadata });
+  if (error) console.warn('logUsage error:', error.message);
 }
 
 export async function getUsageStats(userId: string | null) {
@@ -120,7 +131,8 @@ export async function getUsageStats(userId: string | null) {
   if (!sb) {
     events = safeJsonParse<any[]>(safeStorage.getItem('swar_usage_local'), []);
   } else if (userId) {
-    const { data } = await sb.from('usage_events').select('event_type,created_at').eq('user_id', userId).order('created_at', { ascending: false }).limit(500);
+    const { data, error } = await sb.from('usage_events').select('event_type,created_at').eq('user_id', userId).order('created_at', { ascending: false }).limit(500);
+    if (error) console.warn('getUsageStats error:', error.message);
     events = data || [];
   }
   const stats: Record<string, number> = {};

@@ -6,19 +6,41 @@ import LanguageSelector from '@/components/Layout/LanguageSelector';
 import { useLanguage } from '@/context/LanguageContext';
 import { useSettings } from '@/context/SettingsContext';
 import { useAuth } from '@/context/AuthContext';
+import { upsertProfile } from '@/services/dataStore';
+import { isSupabaseConfigured } from '@/services/supabase';
 
 export default function ProfilePage() {
   const { t } = useLanguage();
   const { settings, updateSettings } = useSettings();
   const { user, loading, signOut } = useAuth();
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   if (loading) return <PageShell><div className="container" style={{ paddingTop: 140, color: '#a0a0a0' }}>{t('loading')}</div></PageShell>;
   if (!user) return <Navigate to="/auth" replace />;
 
-  const save = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 1500);
+  const save = async () => {
+    setSaveError(null);
+    try {
+      if (isSupabaseConfigured()) {
+        await upsertProfile(user.uid, {
+          email: user.email,
+          phone: user.phoneNumber,
+          name: user.name,
+          preferred_language: settings.preferredLanguage,
+          auto_detect_language: settings.autoDetectLanguage,
+          speech_rate: settings.speechRate,
+          easy_mode: settings.easyMode,
+          memory_consent: settings.memoryConsent,
+          save_history: settings.saveHistory,
+          save_audio: settings.saveAudio,
+        });
+      }
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1500);
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : 'Failed to save profile settings.');
+    }
   };
 
   return (
@@ -79,6 +101,7 @@ export default function ProfilePage() {
               </div>
             </div>
 
+            {saveError && <div style={{ color: '#ffb3b3', marginBottom: 12, fontSize: '0.9rem' }}>{saveError}</div>}
             <div className="profile-actions">
               <button className="btn btn-primary" onClick={save}><Save size={16} /> {saved ? t('saved') : t('save')}</button>
               <button className="btn btn-secondary" onClick={() => signOut()}><LogOut size={16} /> {t('navSignOut')}</button>

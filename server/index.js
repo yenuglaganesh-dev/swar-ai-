@@ -3,6 +3,8 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import mammoth from 'mammoth';
+import { extractText as extractPdfText } from 'unpdf';
 import {
   verifySupabaseAuth,
   verifyProviderKey,
@@ -38,7 +40,7 @@ app.use(cors({
   credentials: true,
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
-app.use(express.json({ limit: '1mb' }));
+app.use(express.json({ limit: '4mb' }));
 
 // Vercel catch-all functions can expose the path with or without the /api
 // prefix depending on the function route. Normalize it before Express routing.
@@ -286,6 +288,43 @@ app.delete('/api/key', async (req, res) => {
   return res.json({ ok: true, configured: false, connectionState: 'Not Configured', message: 'API key removed.' });
 });
 
+app.post('/api/extract', async (req, res) => {
+  const filename = String(req.body?.filename || '').trim();
+  const dataBase64 = String(req.body?.dataBase64 || '').trim();
+  if (!filename || !dataBase64) {
+    return res.status(400).json({ ok: false, error: 'INVALID_UPLOAD', message: 'Filename and file content are required.' });
+  }
+  const buffer = Buffer.from(dataBase64, 'base64');
+  if (buffer.length === 0 || buffer.length > 3 * 1024 * 1024) {
+    return res.status(413).json({ ok: false, error: 'FILE_TOO_LARGE', message: 'Document exceeds 3 MB extraction limit.' });
+  }
+  const lower = filename.toLowerCase();
+  try {
+    if (lower.endsWith('.docx')) {
+      const result = await mammoth.extractRawText({ buffer });
+      const text = String(result?.value || '').replace(/\s+\n/g, '\n').trim();
+      return res.json({ ok: true, text: text.slice(0, 12000), isScanned: false });
+    }
+    if (lower.endsWith('.pdf')) {
+      const { text } = await extractPdfText(new Uint8Array(buffer), { mergePages: true });
+      const cleaned = String(text || '').trim();
+      if (!cleaned) {
+        return res.json({
+          ok: true,
+          text: '',
+          isScanned: true,
+          message: 'This PDF appears to be scanned/image-only and requires OCR. You can capture or upload a photo of the page instead.',
+        });
+      }
+      return res.json({ ok: true, text: cleaned.slice(0, 12000), isScanned: false });
+    }
+    return res.status(400).json({ ok: false, error: 'UNSUPPORTED_FORMAT', message: 'Only .pdf and .docx are extracted on the server.' });
+  } catch (err) {
+    console.error('Document extraction failed:', err instanceof Error ? err.message : err);
+    return res.status(422).json({ ok: false, error: 'EXTRACTION_FAILED', message: 'Could not extract text from this document.' });
+  }
+});
+
 function parseJsonSafe(text) { try { return JSON.parse(text); } catch { return null; } }
 
 async function fetchWeather(location) {
@@ -449,12 +488,21 @@ app.post('/api/chat', async (req, res) => {
     liveContext += `\nLive news result: ${JSON.stringify({ ok: n.ok, configured: n.configured, error: n.error, message: n.message, data: n.data, retryAfterSec: n.retryAfterSec })}`;
   }
 
+  const hasImage = imageDataUrl.startsWith('data:image/');
+  if (hasImage) {
+    if (!/^data:image\/(jpeg|jpg|png|webp|gif);base64,/i.test(imageDataUrl)) {
+      return res.status(400).json({ reply: 'Unsupported image format. Please use JPEG, PNG, WebP, or GIF.', detectedLanguage: responseLanguage, suggestions: [], error: 'UNSUPPORTED_IMAGE_FORMAT' });
+    }
+    if (imageDataUrl.length > 2_500_000) {
+      return res.status(413).json({ reply: 'Image is too large. Please upload a smaller or compressed image.', detectedLanguage: responseLanguage, suggestions: [], error: 'IMAGE_TOO_LARGE' });
+    }
+  }
+
   if (!apiKey) {
     return res.status(503).json(fallbackResponse(lastUser, responseLanguage, 'AI_NOT_CONFIGURED'));
   }
 
   try {
-    const hasImage = imageDataUrl.startsWith('data:image/');
     const system = buildSystemPrompt(responseLanguage, autoDetect, {
       mode,
       memories: memories.filter((m) => typeof m === 'string').slice(0, 8),

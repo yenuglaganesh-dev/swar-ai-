@@ -62,6 +62,25 @@ test('Express /api/health and /api/chat validation & safe error responses', asyn
       const r = await fetch(`${baseUrl}${path}`, { method, headers: { 'Content-Type': 'application/json' }, body: method === 'POST' ? '{}' : undefined });
       assert.equal(r.status, 401, `${method} ${path} should require auth`);
     }
+
+    // Upload extraction validation
+    const badExtractRes = await fetch(`${baseUrl}/api/extract`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filename: 'test.exe', dataBase64: Buffer.from('abc').toString('base64') }),
+    });
+    assert.equal(badExtractRes.status, 400);
+
+    // Unsupported image format validation in /api/chat
+    const badImgRes = await fetch(`${baseUrl}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messages: [{ role: 'user', content: 'describe' }],
+        imageDataUrl: 'data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=',
+      }),
+    });
+    assert.equal(badImgRes.status, 400);
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }

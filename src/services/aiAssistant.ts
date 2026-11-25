@@ -199,6 +199,29 @@ export async function removeApiKey(): Promise<ApiKeyStatus> {
   }
 }
 
+export async function extractDocumentText(file: File): Promise<{ ok: boolean; text: string; isScanned?: boolean; message?: string }> {
+  try {
+    const buf = await file.arrayBuffer();
+    const bytes = new Uint8Array(buf);
+    let binary = '';
+    const chunk = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunk) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+    }
+    const dataBase64 = btoa(binary);
+    const res = await fetch('/api/extract', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filename: file.name, dataBase64 }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) return { ok: false, text: '', message: data?.message || 'Failed to extract document text.' };
+    return { ok: true, text: String(data?.text || ''), isScanned: Boolean(data?.isScanned), message: data?.message };
+  } catch {
+    return { ok: false, text: '', message: 'Network error while extracting document text.' };
+  }
+}
+
 export async function fetchWeather(location: string): Promise<ApiResult<WeatherData>> {
   return postJson<WeatherData>('/api/weather', { location });
 }

@@ -14,7 +14,7 @@ import { useAuth } from '@/context/AuthContext';
 import { AssistantStatus, ChatMessage, LanguageCode } from '@/types';
 import { createRecognition, isSpeechRecognitionSupported } from '@/services/speechRecognition';
 import { isSpeechSynthesisSupported, speakText, stopSpeaking } from '@/services/speechSynthesis';
-import { sendChatMessage, fetchApiKeyStatus, activateApiKey, testApiKeyConnection, removeApiKey, type ApiKeyStatus } from '@/services/aiAssistant';
+import { sendChatMessage, fetchApiKeyStatus, activateApiKey, testApiKeyConnection, removeApiKey, extractDocumentText, type ApiKeyStatus } from '@/services/aiAssistant';
 import { safeStorage, safeJsonParse } from '@/services/safeStorage';
 import { detectLanguageFromText } from '@/services/languageDetection';
 import { addMemory, createConversation, getProfile, listMemories, logUsage, saveMessage, upsertProfile } from '@/services/dataStore';
@@ -345,85 +345,65 @@ export default function AssistantPage() {
   const handleDocUpload = async (file: File) => {
     setError(null);
     const name = file.name.toLowerCase();
+    if (file.size > 3 * 1024 * 1024) {
+      setError('File is too large (max 3 MB).');
+      return;
+    }
     if (name.match(/\.(txt|md|csv|json|js|ts|tsx|py|html|css)$/)) {
       const text = await file.text();
       setDocText(text.slice(0, 12000));
       setDocName(file.name);
       return;
     }
-    if (name.endsWith('.docx')) {
-      try {
-        const buf = await file.arrayBuffer();
-        const bytes = new Uint8Array(buf);
-        const view = new DataView(buf);
-        let extracted = '';
-        for (let i = 0; i < bytes.length - 30; i++) {
-          if (view.getUint32(i, true) === 0x04034b50) {
-            const compMethod = view.getUint16(i + 8, true);
-            const compSize = view.getUint32(i + 18, true);
-            const nameLen = view.getUint16(i + 26, true);
-            const extraLen = view.getUint16(i + 28, true);
-            const entryName = new TextDecoder().decode(bytes.slice(i + 30, i + 30 + nameLen));
-            const dataStart = i + 30 + nameLen + extraLen;
-            if (entryName === 'word/document.xml' && compSize > 0 && dataStart + compSize <= bytes.length) {
-              const rawEntry = bytes.slice(dataStart, dataStart + compSize);
-              let xmlText = '';
-              if (compMethod === 0) {
-                xmlText = new TextDecoder().decode(rawEntry);
-              } else if (compMethod === 8 && typeof DecompressionStream !== 'undefined') {
-                const ds = new DecompressionStream('deflate-raw');
-                const writer = ds.writable.getWriter();
-                writer.write(rawEntry);
-                writer.close();
-                xmlText = await new Response(ds.readable).text();
-              }
-              if (xmlText) {
-                extracted = xmlText.replace(/<w:p[^>]*>/g, '\n').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-              }
-              break;
-            }
-          }
-        }
-        setDocText((extracted || `[Attached DOCX: ${file.name} (${Math.max(1, Math.round(file.size / 1024))} KB)]`).slice(0, 12000));
-        setDocName(file.name);
+    if (name.match(/\.(pdf|docx)$/)) {
+      const res = await extractDocumentText(file);
+      if (!res.ok) {
+        setError(res.message || 'Could not extract text from this document.');
         return;
-      } catch {
-        /* fallback below */
       }
-    }
-    if (name.match(/\.(pdf|doc|docx)$/)) {
-      try {
-        const buf = await file.arrayBuffer();
-        const raw = new TextDecoder('latin1').decode(buf);
-        const matches = raw.match(/\(([^()\\]{3,120})\)/g) || [];
-        const textRuns = matches
-          .map((m) => m.slice(1, -1))
-          .filter((s) => /[a-zA-Z0-9\u0900-\u097F\u0C00-\u0C7F]{2}/.test(s))
-          .join(' ')
-          .replace(/\s+/g, ' ')
-          .trim();
-        setDocText((textRuns || `[Attached document: ${file.name} (${Math.max(1, Math.round(file.size / 1024))} KB). Compressed/scanned PDF/DOC text could not be decoded in-browser.]`).slice(0, 12000));
-        setDocName(file.name);
-      } catch {
-        setDocText(`[Attached document: ${file.name}]`);
-        setDocName(file.name);
+      if (res.isScanned) {
+        setError(res.message || 'This PDF appears to be scanned/image-only and requires OCR.');
+        return;
       }
+      setDocText(res.text.slice(0, 12000));
+      setDocName(file.name);
       return;
     }
-    setError('Supported files: .pdf, .doc, .docx, .txt, .md, .csv, .json, and code files.');
+    if (name.endsWith('.doc')) {
+      setError('Legacy .doc binary format is not supported. Please convert to .docx, .pdf, or .txt.');
+      return;
+    }
+    setError('Supported files: .pdf, .docx, .txt, .md, .csv, .json, and code files.');
   };
 
   const handlePhotoUpload = (file: File) => {
-    if (!file.type.startsWith('image/')) {
-      setError('Please select a valid image file.');
+    setError(null);
+    if (!/^image\/(jpeg|jpg|png|webp|gif)$/i.test(file.type)) {
+      setError('Unsupported image format. Please choose a JPEG, PNG, WebP, or GIF image.');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setError('Image file is too large (max 10 MB).');
       return;
     }
     const reader = new FileReader();
     reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        setImageDataUrl(reader.result);
-        setError(null);
-      }
+      const rawUrl = typeof reader.result === 'string' ? reader.result : '';
+      if (!rawUrl) return;
+      const img = new window.Image();
+      img.onload = () => {
+        const maxDim = 1280;
+        const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(img.width * scale));
+        canvas.height = Math.max(1, Math.round(img.height * scale));
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { setImageDataUrl(rawUrl); return; }
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        setImageDataUrl(canvas.toDataURL('image/jpeg', 0.8));
+      };
+      img.onerror = () => setError('Could not load selected image.');
+      img.src = rawUrl;
     };
     reader.readAsDataURL(file);
   };
